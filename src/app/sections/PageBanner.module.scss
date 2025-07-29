@@ -1,0 +1,122 @@
+.page__banner__container {
+  width: 100%;
+  background-color: var(--button-primary-bg);
+  padding: 12px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 42px;
+
+  color: var(--menu-text);
+
+  &.light {
+    color: var(--button-primary-text);
+  }
+
+  &.blossom {
+    color: #ffffff;
+  }
+
+  &.madness {
+    color: var(--button-primary-text);
+
+    .content {
+      .button {
+        &:hover {
+          background-color: rgba(20, 20, 20, 0.1215686275);
+        }
+      }
+    }
+  }
+
+  .content {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .close__icon {
+    cursor: pointer;
+  }
+
+  .button {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    border: 1px solid currentColor;
+    border-radius: 15px;
+    font-size: 11px;
+    font-weight: var(--bold);
+    color: currentColor;
+    line-height: 1;
+    padding: 0 16px;
+    text-decoration: none;
+    transition: background-color 0.2s ease-in-out;
+
+    &:hover {
+      background-color: #ffffff1f;
+    }
+  }
+
+  @media (max-width: 600px) {
+    gap: 20px;
+
+    .content {
+      gap: 18px;
+    }
+  }
+
+  @media (max-width: 500px) {
+    gap: 12px;
+    padding: 12px 10px;
+
+    svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .content {
+      gap: 14px;
+    }
+
+    h4 {
+      font-size: 12px;
+    }
+
+    .button {
+      font-size: 10px;
+      padding: 0 8px;
+      height: 22px;
+      min-width: 76px;
+    }
+  }
+
+  @media (max-width: 425px) {
+    gap: 8px;
+    padding: 12px 6px;
+
+    svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .content {
+      gap: 10px;
+    }
+
+    h4 {
+      font-size: 11px;
+    }
+
+    .button {
+      font-size: 10px;
+      padding: 0 8px;
+      height: 22px;
+      min-width: 76px;
+    }
+  }
+}

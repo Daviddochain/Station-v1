@@ -1,0 +1,11 @@
+@import "src/styles/_mixins.scss";
+
+.link {
+  @include flex;
+  gap: 4px;
+  color: var(--text);
+
+  &:hover {
+    text-decoration: none;
+  }
+}

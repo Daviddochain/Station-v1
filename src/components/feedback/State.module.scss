@@ -1,0 +1,14 @@
+@import "src/styles/_mixins.scss";
+
+.component {
+  padding: 30px 0;
+  text-align: center;
+}
+
+.icon {
+  font-size: 56px;
+}
+
+.content {
+  word-break: break-all;
+}

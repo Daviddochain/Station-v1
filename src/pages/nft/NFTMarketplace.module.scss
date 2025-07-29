@@ -1,0 +1,7 @@
+@import "src/styles/_mixins.scss";
+
+.link {
+  @include flex(space-between);
+  border-top: 1px solid var(--card-border);
+  padding: 16px 0;
+}
