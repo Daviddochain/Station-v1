@@ -21,6 +21,8 @@
   "dependencies": {
     "@amplitude/analytics-browser": "^2.0.0",
     "@anchor-protocol/anchor.js": "^5.1.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@ledgerhq/hw-transport-web-ble": "^6.27.1",
     "@mui/icons-material": "^5.8.0",
     "@mui/material": "^5.9.1",
