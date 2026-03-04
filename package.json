@@ -36,7 +36,7 @@
     "@terra-money/terra-station-mobile": "^1.0.12",
     "@terra-money/terra-utils": "^1.1.1",
     "@terra-money/terra.js": "3.1.9",
-    "@terra-money/terra.proto": "2.1.0",
+    "@terra-money/terra.proto": "^4.0.10",
     "@terra-money/wallet-kit": "^1.0.15",
 
     "@tippyjs/react": "^4.2.6",
