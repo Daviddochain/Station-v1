@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .container {
   overflow-y: scroll;
   max-height: 70vh;

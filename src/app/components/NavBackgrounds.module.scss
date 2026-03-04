@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .nav_background_wrapper {
   position: absolute;
   left: 0;
@@ -17,7 +16,7 @@
     }
   }
 
-  @include mobile {
+  @include mixins.mobile {
     display: none;
   }
 }

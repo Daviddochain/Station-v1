@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 @mixin border {
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--border-radius);
@@ -63,13 +62,13 @@
 
 /* components */
 .header {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   font-size: 16px;
 }
 
 .title {
-  @include flex(flex-start);
-  @include truncate;
+  @include mixins.flex(flex-start);
+  @include mixins.truncate;
   gap: 8px; // for icon
   width: 100%;
 }
@@ -129,5 +128,5 @@
 }
 
 .error .main {
-  @include flex;
+  @include mixins.flex;
 }

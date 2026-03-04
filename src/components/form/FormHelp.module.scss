@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .component {
-  @include flex(flex-start, flex-start);
+  @include mixins.flex(flex-start, flex-start);
 
   border-radius: 5px;
   font-size: var(--font-size-small);

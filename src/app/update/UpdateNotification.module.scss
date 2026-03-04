@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .notification {
   z-index: 1000;
   position: absolute;

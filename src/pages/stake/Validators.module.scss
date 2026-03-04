@@ -1,14 +1,13 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .select__asset {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   padding-bottom: var(--grid-gap);
   padding-inline: var(--main-padding-horizontal);
   gap: 0.6rem;
 }
 
 .moniker {
-  @include truncate;
+  @include mixins.truncate;
   color: var(--text);
   font-weight: var(--bold);
   max-width: 12rem;

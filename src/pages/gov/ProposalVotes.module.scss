@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .total {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -15,11 +14,11 @@
   flex: 1;
   gap: 24px;
 
-  @include desktop {
+  @include mixins.desktop {
     display: flex;
   }
 
-  @include mobile {
+  @include mixins.mobile {
     display: grid;
     grid-template: repeat(2, 1fr) / repeat(2, 1fr);
   }

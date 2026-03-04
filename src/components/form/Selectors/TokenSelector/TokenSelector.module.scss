@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .popover {
   min-width: 160px;
   height: 200px;
@@ -7,7 +6,7 @@
 }
 
 .selector {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   background-color: var(--button-default-bg);
   padding: 0.4rem 0.8rem;
   appearance: none;
@@ -15,7 +14,7 @@
   min-width: 160px;
 
   span {
-    @include flex(flex-start);
+    @include mixins.flex(flex-start);
 
     img {
       width: 18px;
@@ -62,7 +61,7 @@
   button {
     padding: 6px 12px;
     width: 100%;
-    @include flex(flex-start);
+    @include mixins.flex(flex-start);
     border-radius: var(--border-radius);
 
     img {

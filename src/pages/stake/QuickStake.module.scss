@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .quick__action {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   padding-bottom: var(--grid-gap);
   padding-inline: var(--main-padding-horizontal);
   gap: 0.6rem;

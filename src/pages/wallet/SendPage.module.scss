@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .form {
   display: grid;
   max-height: calc(100vh - var(--header-height));

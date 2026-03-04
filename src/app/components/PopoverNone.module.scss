@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .component {
-  @include flex-column(space-between, stretch);
+  @include mixins.flex-column(space-between, stretch);
   background: var(--card-bg);
 }
 
@@ -10,7 +9,7 @@
 }
 
 .footer {
-  @include flex;
+  @include mixins.flex;
 
   background: var(--bg);
   border-top: solid 1px var(--card-border);

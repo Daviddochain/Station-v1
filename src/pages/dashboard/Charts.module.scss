@@ -1,10 +1,9 @@
-@import "mixins";
-
+@use "src/styles/_mixins.scss";
 .charts {
   display: grid;
   gap: var(--grid-gap);
 
-  @include desktop {
+  @include mixins.desktop {
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(2, 1fr);
   }

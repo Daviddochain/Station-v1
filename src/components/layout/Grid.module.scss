@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .grid {
   display: grid;
 }
@@ -8,12 +7,12 @@
   display: flex;
   gap: var(--grid-gap);
 
-  @include mobile {
+  @include mixins.mobile {
     flex-direction: column;
   }
 }
 
-@include desktop {
+@include mixins.desktop {
   .start {
     align-items: flex-start;
   }

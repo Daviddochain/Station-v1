@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .assetlist {
   background-color: var(--card-bg-muted);
   padding-inline: 10px;
@@ -11,7 +10,7 @@
 }
 
 .assetlist__title {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   margin: 25px 10px 10px;
   grid-area: title;
 }

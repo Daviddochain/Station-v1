@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .tabs {
   white-space: nowrap;
 }
@@ -12,9 +11,9 @@
   font-weight: var(--bold);
   overflow: hidden;
 
-  @include flex(space-between, center);
+  @include mixins.flex(space-between, center);
 
-  @include mobile {
+  @include mixins.mobile {
     display: flex;
   }
 
@@ -64,13 +63,13 @@
     color: var(--text-muted);
   }
 
-  @include desktop {
+  @include mixins.desktop {
     padding: 0 30px;
   }
 }
 
 .tabsContainer {
-  @include flex-column(unset, unset);
+  @include mixins.flex-column(unset, unset);
 }
 
 .content {
@@ -89,7 +88,7 @@
   margin-bottom: 20px;
   overflow: hidden;
 
-  @include mobile {
+  @include mixins.mobile {
     display: flex;
   }
 
@@ -101,7 +100,7 @@
 }
 
 .tab {
-  @include inline-flex;
+  @include mixins.inline-flex;
   color: inherit;
 
   &:hover {
@@ -133,11 +132,11 @@
     color: var(--text-muted);
   }
 
-  @include desktop {
+  @include mixins.desktop {
     padding: 0 30px;
   }
 
-  @include mobile {
+  @include mixins.mobile {
     flex: 1;
     text-align: center;
   }
@@ -176,5 +175,5 @@
 }
 
 .disabled {
-  @include disabled;
+  @include mixins.disabled;
 }

@@ -1,6 +1,5 @@
 @use "sass:color";
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .chainfilter,
 .chainfilter__out {
   .header {
@@ -15,13 +14,13 @@
     }
 
     .pills {
-      @include flex(flex-start);
+      @include mixins.flex(flex-start);
       gap: 0.4rem;
       flex-wrap: wrap;
     }
 
     .button {
-      @include flex(center);
+      @include mixins.flex(center);
       gap: 0.5rem;
       min-width: 4rem;
       border: var(--border-width) solid var(--card-border);

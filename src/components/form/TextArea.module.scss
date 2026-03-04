@@ -1,14 +1,14 @@
-@import "forms";
+@use "forms";
 
 .textarea {
-  @include border;
+  @include forms.border;
   padding: 12px;
   white-space: normal;
 }
 
 .editor {
-  @include border;
-  @include padding;
+  @include forms.border;
+  @include forms.padding;
   font-family: var(--font-family-monospace);
   overflow: auto;
 }

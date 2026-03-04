@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .minimized {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
 
   position: absolute;
   top: calc(100% + var(--grid-gap));
@@ -63,7 +62,7 @@
 }
 
 .hash {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
 }
 
 /* color */

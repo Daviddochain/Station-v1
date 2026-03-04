@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .locked .preview {
   opacity: 0.1;
 }
@@ -24,7 +23,7 @@
 }
 
 .unlock small {
-  @include mobile {
+  @include mixins.mobile {
     display: none;
   }
 }

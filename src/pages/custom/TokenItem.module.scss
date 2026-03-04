@@ -1,12 +1,11 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .item {
   border-bottom: 1px solid var(--card-border);
   padding: 12px 0;
 }
 
 .button {
-  @include flex;
+  @include mixins.flex;
 
   background: var(--button-default-bg);
   border-radius: 50%;

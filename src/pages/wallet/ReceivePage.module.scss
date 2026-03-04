@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .receive {
   background-color: var(--card-bg-muted);
   padding: 20px;
@@ -25,7 +24,7 @@
 }
 
 .chain__selector {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   gap: 10px;
 
   button {

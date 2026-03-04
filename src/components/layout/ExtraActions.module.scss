@@ -1,20 +1,19 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .actions {
   flex-wrap: wrap;
   gap: 12px;
 }
 
 .end {
-  @include flex(flex-end);
+  @include mixins.flex(flex-end);
 }
 
 .center {
-  @include flex;
+  @include mixins.flex;
 }
 
 .stretch {
-  @include flex(stretch);
+  @include mixins.flex(stretch);
 
   > * {
     flex: 1;

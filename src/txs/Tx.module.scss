@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .gas {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   gap: 8px;
 }
 

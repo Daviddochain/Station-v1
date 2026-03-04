@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .button {
   border: var(--border-width) solid var(--button-default-bg);
   width: 38px;
@@ -7,7 +6,7 @@
 }
 
 .status {
-  @include flex;
+  @include mixins.flex;
   background: var(--button-primary-bg);
   color: var(--button-primary-text);
   font-size: var(--font-size-small);

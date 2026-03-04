@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .overlay {
-  @include flex;
+  @include mixins.flex;
 
   background: var(--bg);
   color: var(--text);

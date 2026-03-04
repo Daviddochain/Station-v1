@@ -1,8 +1,7 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .item {
   --padding: 12px 16px;
-  @include flex(flex-start, stretch);
+  @include mixins.flex(flex-start, stretch);
   background: var(--card-bg);
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--border-radius);
@@ -26,7 +25,7 @@
 }
 
 .delete {
-  @include flex;
+  @include mixins.flex;
   flex: none;
   border-left: 1px solid var(--card-border);
   color: var(--text);

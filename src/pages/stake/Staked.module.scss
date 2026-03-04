@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .staked__container {
   display: grid;
   grid-gap: var(--grid-gap);
@@ -7,7 +6,7 @@
   min-width: 275px;
   flex: 1 1 0%;
 
-  @include mobile {
+  @include mixins.mobile {
     grid-auto-flow: column;
     min-width: unset;
   }

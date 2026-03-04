@@ -1,14 +1,13 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .header {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   gap: 16px;
 
   &.vertical {
     display: grid;
   }
 
-  @include mobile {
+  @include mixins.mobile {
     display: grid;
   }
 }

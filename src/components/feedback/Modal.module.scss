@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .overlay {
-  @include flex;
+  @include mixins.flex;
   background: hsl(0 0% 0% / 0.8);
 
   position: fixed;

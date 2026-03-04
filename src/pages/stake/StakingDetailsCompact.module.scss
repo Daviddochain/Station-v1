@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .token__icon__container {
   position: relative;
   margin-right: 12px;
@@ -57,7 +56,7 @@
   .delegated__amount {
     color: var(--text-muted);
     font-size: 11pt;
-    @include flex(flex-start);
+    @include mixins.flex(flex-start);
     gap: 0.4rem;
 
     img {

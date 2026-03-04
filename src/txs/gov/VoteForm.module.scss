@@ -1,20 +1,19 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .options {
   gap: 16px;
 
-  @include desktop {
-    @include flex;
+  @include mixins.desktop {
+    @include mixins.flex;
   }
 
-  @include mobile {
+  @include mixins.mobile {
     display: grid;
     grid-template: repeat(2, 1fr) / repeat(2, 1fr);
   }
 }
 
 .option {
-  @include flex;
+  @include mixins.flex;
   flex: 1;
 
   border-radius: var(--border-radius);

@@ -1,19 +1,19 @@
-@import "src/styles/_mixins.scss";
-@import "forms";
+@use "src/styles/_mixins.scss";
+@use "forms";
 
 .container {
   position: relative;
 }
 
 .selector {
-  @include border;
-  @include size;
-  @include flex(space-between);
+  @include forms.border;
+  @include forms.size;
+  @include mixins.flex(space-between);
   appearance: none;
   width: 100%;
 
   span {
-    @include flex(flex-start);
+    @include mixins.flex(flex-start);
 
     img {
       width: 18px;
@@ -68,7 +68,7 @@
   button {
     padding: 6px 12px;
     width: 100%;
-    @include flex(flex-start);
+    @include mixins.flex(flex-start);
     border-radius: var(--border-radius);
 
     img {

@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .card {
   background: var(--bg);
   border: solid 1px var(--card-border);
@@ -22,14 +21,14 @@
 }
 
 .checkbox {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   border-top: 1px solid var(--card-border);
   padding: 12px 0;
   width: 100%;
 }
 
 .item {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   flex: 1;
 }
 

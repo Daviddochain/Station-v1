@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .noDelegationsCard {
   height: 300px;
   display: flex;

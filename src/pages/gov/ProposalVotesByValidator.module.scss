@@ -1,15 +1,14 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .filter {
   overflow: hidden;
 
-  @include mobile {
+  @include mixins.mobile {
     display: grid;
     gap: 12px;
   }
 
-  @include desktop {
-    @include flex(space-between);
+  @include mixins.desktop {
+    @include mixins.flex(space-between);
   }
 }
 
@@ -37,7 +36,7 @@
 
 /* content */
 .link {
-  @include inline-flex;
+  @include mixins.inline-flex;
   vertical-align: middle;
 
   &.disabled {

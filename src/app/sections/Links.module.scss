@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .links {
   --gutter: 10px;
 }
@@ -24,7 +23,7 @@
 
 /* item */
 .link {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
 
   gap: 4px;
   color: var(--menu-text);

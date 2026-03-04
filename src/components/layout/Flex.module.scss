@@ -1,15 +1,14 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .flex {
-  @include flex;
+  @include mixins.flex;
 }
 
 .column {
-  @include flex-column;
+  @include mixins.flex-column;
 }
 
 .inline {
-  @include inline-flex;
+  @include mixins.inline-flex;
 }
 
 /* align */

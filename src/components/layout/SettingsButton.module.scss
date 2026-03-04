@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .button {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--border-radius);
   color: inherit;
@@ -18,7 +17,7 @@
 }
 
 .button__action {
-  @include flex;
+  @include mixins.flex;
   gap: 6px;
 
   span {

@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .wallet {
   width: min(var(--wallet-width), 100vw);
   grid-area: walletbar;
@@ -36,7 +35,7 @@
   border-radius: 10px 0 0 10px;
   border: var(--border-width) solid var(--card-border);
   transition: 300ms;
-  @include flex(center);
+  @include mixins.flex(center);
   flex-direction: column;
   gap: 0.3rem;
 

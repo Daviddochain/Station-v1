@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .chain {
-  @include flex(space-between, center);
+  @include mixins.flex(space-between, center);
   gap: 10px;
   padding: 10px;
   border-radius: 10px;
@@ -21,7 +20,7 @@
 
 .name {
   grid-area: name;
-  @include flex(center, flex-start);
+  @include mixins.flex(center, flex-start);
   flex-direction: column;
   font-size: 15px;
 
@@ -45,7 +44,7 @@
   }
 
   h4 {
-    @include flex(flex-start);
+    @include mixins.flex(flex-start);
     gap: 8px;
     font-size: 16px;
 

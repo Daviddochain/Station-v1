@@ -1,5 +1,5 @@
-@import "src/styles/_mixins.scss";
-@import "forms";
+@use "src/styles/_mixins.scss";
+@use "forms";
 
 .form {
   display: grid;
@@ -30,8 +30,8 @@
   }
 
   .button {
-    @include border;
-    @include size;
+    @include forms.border;
+    @include forms.size;
     flex: none;
     width: var(--input-height);
   }
@@ -39,7 +39,7 @@
 
 /* form item */
 .header {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
 }
 
 .label {

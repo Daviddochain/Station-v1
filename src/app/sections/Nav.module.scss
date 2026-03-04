@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .header {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   border-bottom: var(--border-width) solid var(--menu-border);
   margin-bottom: 26px;
   z-index: 1;
@@ -12,7 +11,7 @@
   color: var(--menu-text);
   padding: 20px;
 
-  @include desktop {
+  @include mixins.desktop {
     display: none;
   }
 }
@@ -54,7 +53,7 @@
 }
 
 .link {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
 
   gap: 10px;
   opacity: 0.75;
@@ -70,7 +69,7 @@
     font-weight: var(--bold);
   }
 
-  @include mobile {
+  @include mixins.mobile {
     font-size: 28px;
     padding: 6px 20px;
 
@@ -88,7 +87,7 @@
   filter: blur(95px);
   z-index: 1;
 
-  @include mobile {
+  @include mixins.mobile {
     display: none;
   }
 

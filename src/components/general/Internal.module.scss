@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .item {
-  @include inline-flex;
+  @include mixins.inline-flex;
 
   color: var(--button-primary-bg);
   font-size: var(--font-size-small);
@@ -11,15 +10,15 @@
 }
 
 .icon {
-  @include flex;
+  @include mixins.flex;
   font-size: 18px;
 }
 
 .disabled {
-  @include disabled;
+  @include mixins.disabled;
 }
 
 .chevron {
-  @include flex;
+  @include mixins.flex;
   font-size: 16px;
 }

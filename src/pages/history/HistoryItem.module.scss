@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .header {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   padding: var(--card-padding);
   padding-top: 0;
   font-size: var(--font-size-small);
@@ -10,11 +9,11 @@
   margin-bottom: var(--card-padding);
 
   .txhash {
-    @include flex(flex-start);
+    @include mixins.flex(flex-start);
     gap: 0.8rem;
 
     .chain {
-      @include flex(flex-start);
+      @include mixins.flex(flex-start);
       gap: 0.4rem;
       width: fit-content;
       background-color: var(--button-default-bg);
@@ -35,7 +34,7 @@
   }
 
   .time {
-    @include flex(flex-end);
+    @include mixins.flex(flex-end);
     gap: 0.4rem;
     font-size: 10pt;
     font-weight: var(--bold);
@@ -49,7 +48,7 @@
 }
 
 .msgs {
-  @include flex(flex-start, flex-start);
+  @include mixins.flex(flex-start, flex-start);
   flex-direction: column;
   gap: calc(var(--card-padding) * 0.6);
 }
@@ -66,7 +65,7 @@
 }
 
 .sign__mode {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   margin-top: 4px;
   color: var(--info);
   gap: 4px;

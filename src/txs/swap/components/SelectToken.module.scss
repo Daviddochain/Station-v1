@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 // toggle
 .toggle {
   font-size: 18px;
@@ -36,7 +35,7 @@
 }
 
 .empty {
-  @include flex;
+  @include mixins.flex;
   font-size: var(--font-size-small);
   font-weight: var(--bold);
 }

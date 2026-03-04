@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .container {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   align-items: center;
   width: fit-content;
   background-color: var(--button-default-bg);

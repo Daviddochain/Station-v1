@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .checkbox {
-  @include inline-flex;
+  @include mixins.inline-flex;
   cursor: pointer;
   font-size: var(--font-size-small);
   gap: 8px;
@@ -12,7 +11,7 @@
   }
 
   &.disabled {
-    @include disabled;
+    @include mixins.disabled;
   }
 
   .text {
@@ -21,7 +20,7 @@
 }
 
 .track {
-  @include flex;
+  @include mixins.flex;
 
   border: solid 1px var(--input-border);
   border-radius: 2px;

@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .border {
   border: solid 1px var(--input-border);
   border-radius: var(--border-radius);
@@ -7,7 +6,7 @@
 }
 
 .header {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   font-size: var(--font-size-small);
   font-weight: var(--bold);
   padding: 16px 20px 0;

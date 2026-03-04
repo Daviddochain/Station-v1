@@ -1,4 +1,4 @@
-@import "src/styles/_mixins.scss";
+@use "src/styles/_mixins.scss";
 .popover__none {
   min-width: 100px;
   border-radius: var(--border-radius);
@@ -10,7 +10,7 @@
 }
 
 .button {
-  @include flex(center);
+  @include mixins.flex(center);
   gap: 0.5rem;
   min-width: 4rem;
   border: var(--border-width) solid var(--card-border);

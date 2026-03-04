@@ -1,12 +1,11 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .wrapper {
-  @include flex-column();
+  @include mixins.flex-column();
   gap: 8px;
 }
 
 .item {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   border-top: solid 1px var(--card-border);
   color: var(--text);
   font-weight: var(--bold);
@@ -14,7 +13,7 @@
   transition: background var(--transition);
   width: 100%;
 
-  @include mobile {
+  @include mixins.mobile {
     padding: 12px 10px;
   }
 

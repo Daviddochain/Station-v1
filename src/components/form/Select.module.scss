@@ -1,12 +1,12 @@
-@import "forms";
+@use "forms";
 
 .wrapper {
   position: relative;
 }
 
 .select {
-  @include border;
-  @include size;
+  @include forms.border;
+  @include forms.size;
   appearance: none;
   padding-right: 36px;
   width: 100%;

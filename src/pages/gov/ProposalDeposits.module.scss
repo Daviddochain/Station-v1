@@ -1,12 +1,11 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .main {
   display: grid;
   align-items: center;
 }
 
 .horizontal {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   gap: 24px;
 }
 

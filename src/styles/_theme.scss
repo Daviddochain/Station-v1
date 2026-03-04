@@ -1,5 +1,4 @@
-@import "mixins";
-
+@use "src/styles/_mixins.scss";
 :root {
   // sizes
   --border-width: 1px;
@@ -28,11 +27,11 @@
   // miscellaneous
   --transition: 100ms;
 
-  @include desktop {
+  @include mixins.desktop {
     --main-padding-horizontal: 20px;
   }
 
-  @include mobile {
+  @include mixins.mobile {
     --main-padding-horizontal: 20px;
   }
 }
@@ -98,7 +97,7 @@
 
   --wallet-shadow-color: rgb(0 0 0 / 31%);
 
-  @include mobile {
+  @include mixins.mobile {
     --menu-bg: var(--card-bg);
     --menu-border: var(--card-border);
     --menu-text: var(--text);

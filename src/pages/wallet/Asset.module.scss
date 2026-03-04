@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .asset {
-  @include flex(space-between, flex-start);
+  @include mixins.flex(space-between, flex-start);
   padding: 10px;
   border-radius: 10px;
   position: relative; // to loading indicator
@@ -14,7 +13,7 @@
 }
 
 .details {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   gap: 16px;
   width: 100%;
 
@@ -55,7 +54,7 @@
 }
 
 .symbol {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   gap: 6px;
   font-size: 16px;
   overflow: hidden;
@@ -101,7 +100,7 @@
 
 .change__up,
 .change__down {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
   font-weight: var(--normal);
   gap: 4px;
 }

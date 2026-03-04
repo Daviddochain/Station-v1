@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .label {
-  @include flex;
+  @include mixins.flex;
   gap: 8px;
 
   border: solid 1px var(--input-border);

@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .header {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
 }
 
 .pre {

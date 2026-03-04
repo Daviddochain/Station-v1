@@ -1,8 +1,7 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .container {
   position: relative;
-  @include flex;
+  @include mixins.flex;
   height: 700px;
   width: 450px;
 }

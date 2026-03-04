@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .item {
-  @include flex;
+  @include mixins.flex;
 
   gap: 12px;
   padding: 20px 0;
@@ -12,7 +11,7 @@
 }
 
 .compact {
-  @include flex(flex-start);
+  @include mixins.flex(flex-start);
 
   &:not(:first-child) {
     border-top: 1px solid var(--card-border);

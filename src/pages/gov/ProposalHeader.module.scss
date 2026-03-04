@@ -1,16 +1,15 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .header {
   overflow: hidden;
 }
 
 .meta {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   font-size: var(--font-size-small);
   margin-bottom: 18px;
 
   aside {
-    @include flex(flex-start);
+    @include mixins.flex(flex-start);
     gap: 8px;
 
     img {

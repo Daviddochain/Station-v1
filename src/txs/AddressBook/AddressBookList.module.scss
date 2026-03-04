@@ -1,7 +1,6 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .address__button {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   background: var(--card-bg);
   border: var(--border-width) solid var(--card-border);
   border-radius: var(--border-radius);
@@ -14,7 +13,7 @@
   }
 
   span {
-    @include flex(flex-start);
+    @include mixins.flex(flex-start);
     gap: 10px;
     font-weight: var(--bold);
     img {

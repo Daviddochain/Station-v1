@@ -1,24 +1,24 @@
-@import "src/styles/_mixins.scss";
-@import "forms";
+@use "src/styles/_mixins.scss";
+@use "forms";
 
 .wrapper {
-  @include flex;
+  @include mixins.flex;
   align-items: stretch;
 }
 
 .input {
-  @include border;
-  @include size;
+  @include forms.border;
+  @include forms.size;
   flex: 1;
 }
 
 .symbol {
-  @include border;
-  @include size;
+  @include forms.border;
+  @include forms.size;
 }
 
 .before {
-  @include border;
+  @include forms.border;
   border-right: 0;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;

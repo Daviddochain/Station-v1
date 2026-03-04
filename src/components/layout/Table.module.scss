@@ -1,5 +1,4 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .container {
   display: grid;
   gap: 28px;
@@ -99,7 +98,7 @@
 
 /* sorter */
 .sorter {
-  @include inline-flex;
+  @include mixins.inline-flex;
   gap: 8px;
 }
 

@@ -1,14 +1,13 @@
-@import "src/styles/_mixins.scss";
-
+@use "src/styles/_mixins.scss";
 .page {
   overflow-y: auto;
   // padding here to position progress bar
 
-  @include desktop {
+  @include mixins.desktop {
     padding: 32px var(--main-padding-horizontal);
   }
 
-  @include mobile {
+  @include mixins.mobile {
     padding: 28px var(--main-padding-horizontal);
   }
 
@@ -24,11 +23,11 @@
 .grid {
   display: grid;
 
-  @include desktop {
+  @include mixins.desktop {
     gap: 18px;
   }
 
-  @include mobile {
+  @include mixins.mobile {
     gap: 16px;
   }
 }
@@ -45,14 +44,14 @@
 }
 
 .header {
-  @include flex(space-between);
+  @include mixins.flex(space-between);
   margin-right: 24px;
 
-  @include desktop {
+  @include mixins.desktop {
     --font-size-page-title: 36px;
   }
 
-  @include mobile {
+  @include mixins.mobile {
     --font-size-page-title: 28px;
   }
 
@@ -61,7 +60,7 @@
   }
 
   .titleWrapper {
-    @include flex(center);
+    @include mixins.flex(center);
     gap: 12px;
 
     svg:hover {
@@ -76,7 +75,7 @@
 
 .sub {
   .header {
-    @include mobile {
+    @include mixins.mobile {
       display: grid;
       gap: 8px;
     }
@@ -87,7 +86,7 @@
   }
 }
 
-@include desktop {
+@include mixins.desktop {
   .small {
     gap: 36px;
 
