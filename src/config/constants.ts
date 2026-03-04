@@ -7,7 +7,7 @@ export const BRIDGE = "https://walletconnect.terra.dev"
 /* api */
 export const ASSETS = process.env.REACT_APP_ASSETS ?? "https://assets.terra.dev"
 export const STATION_ASSETS =
-  process.env.REACT_APP_STATION_ASSETS ?? "https://station-assets.terra.dev"
+  process.env.REACT_APP_STATION_ASSETS ?? "http://localhost:3001"
 
 export const OBSERVER = "wss://observer.terra.dev"
 
