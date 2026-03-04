@@ -2,7 +2,7 @@ import { atom, useRecoilState, useRecoilValue } from "recoil"
 import { useNetworks } from "app/InitNetworks"
 import { getStoredNetwork, storeNetwork } from "../scripts/network"
 import { useWallet, WalletStatus } from "@terra-money/wallet-kit"
-import { walletState } from "./useAuth"
+import { walletState } from "../state/walletState"
 import is from "../scripts/is"
 import { useCustomLCDs } from "utils/localStorage"
 import { ChainFeature } from "types/chains"
@@ -43,8 +43,8 @@ export const useNetworkWithFeature = (feature?: ChainFeature) => {
     Object.entries(networks).filter(
       ([_, n]) =>
         !Array.isArray(n.disabledModules) ||
-        !n.disabledModules.includes(feature)
-    )
+        !n.disabledModules.includes(feature),
+    ),
   )
 }
 
@@ -61,7 +61,7 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
       Object.entries(networks ?? {}).map(([key, val]) => [
         key,
         { ...val, lcd: customLCDs[val?.chainID] || val.lcd },
-      ]) ?? {}
+      ]) ?? {},
     )
   }
 
@@ -87,7 +87,7 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
       setNetwork("localterra")
     }
     return filterEnabledNetworks(
-      connectedWallet.network as Record<ChainID, InterchainNetwork>
+      connectedWallet.network as Record<ChainID, InterchainNetwork>,
     )
   }
 
@@ -95,8 +95,8 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
   if (is.multisig(wallet)) {
     const terra = Object.values(
       withCustomLCDs(
-        networks[network as NetworkName] as Record<ChainID, InterchainNetwork>
-      ) ?? {}
+        networks[network as NetworkName] as Record<ChainID, InterchainNetwork>,
+      ) ?? {},
     ).find(({ prefix }) => prefix === "terra")
     if (!terra) return {}
     return filterEnabledNetworks({ [terra?.chainID]: terra })
@@ -105,15 +105,18 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
   if (wallet) {
     const enabledChains = Object.values(
       withCustomLCDs(
-        networks[network as NetworkName] as Record<ChainID, InterchainNetwork>
-      ) ?? {}
+        networks[network as NetworkName] as Record<ChainID, InterchainNetwork>,
+      ) ?? {},
     ).filter(({ coinType }) => !!wallet?.words?.[coinType])
 
     return filterEnabledNetworks(
-      enabledChains.reduce((acc, chain) => {
-        acc[chain?.chainID] = chain
-        return acc
-      }, {} as Record<ChainID, InterchainNetwork>)
+      enabledChains.reduce(
+        (acc, chain) => {
+          acc[chain?.chainID] = chain
+          return acc
+        },
+        {} as Record<ChainID, InterchainNetwork>,
+      ),
     )
   }
 

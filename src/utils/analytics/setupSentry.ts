@@ -22,3 +22,5 @@ export const setupSentry = () => {
     replaysOnErrorSampleRate: 1.0,
   })
 }
+// Backwards-compatible alias (some parts import initSentry)
+export const initSentry = setupSentry

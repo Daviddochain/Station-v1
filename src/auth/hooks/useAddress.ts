@@ -4,6 +4,8 @@ import { addressFromWords } from "utils/bech32"
 import useAuth from "./useAuth"
 import { useChainID, useNetwork, useNetworkWithFeature } from "./useNetwork"
 import { ChainFeature } from "types/chains"
+import { useRecoilValue } from "recoil"
+import { walletState } from "../state/walletState"
 
 /* auth | walle-provider */
 const useAddress = () => {
@@ -26,7 +28,7 @@ export const useInterchainAddresses = () => {
   const connected = useConnectedWallet()
   const { filterEnabledNetworks } = useNetworks()
   const networks = useNetwork()
-  const { wallet } = useAuth()
+  const wallet = useRecoilValue(walletState)
 
   if (connected?.addresses) {
     return filterEnabledNetworks(connected.addresses)
@@ -40,7 +42,7 @@ export const useInterchainAddresses = () => {
       acc[chainID] = addressFromWords(words[coinType] as string, prefix)
       return acc
     },
-    {} as Record<string, string>
+    {} as Record<string, string>,
   )
   return addresses
 }
@@ -49,7 +51,7 @@ export const useInterchainAddressesWithFeature = (feature?: ChainFeature) => {
   const addresses = useInterchainAddresses()
   const networks = useNetworkWithFeature(feature)
   return Object.fromEntries(
-    Object.entries(addresses).filter(([key, _]) => networks[key])
+    Object.entries(addresses).filter(([key, _]) => networks[key]),
   )
 }
 

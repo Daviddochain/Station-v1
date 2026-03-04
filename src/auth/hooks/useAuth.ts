@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react"
-import { atom, useRecoilState } from "recoil"
+import { useRecoilState } from "recoil"
 import { encode } from "js-base64"
 import {
   CreateTxOptions,
@@ -22,11 +22,7 @@ import useAvailable from "./useAvailable"
 import { addressFromWords, wordsFromAddress } from "utils/bech32"
 import { useNetwork } from "./useNetwork"
 import { createBleTransport } from "utils/ledger"
-
-export const walletState = atom({
-  key: "interchain-wallet",
-  default: getWallet(),
-})
+import { walletState } from "../state/walletState"
 
 const useAuth = () => {
   const lcd = useInterchainLCDClient()
@@ -62,7 +58,7 @@ const useAuth = () => {
         setWallet(storedWallet as any)
       }
     },
-    [setWallet]
+    [setWallet],
   )
 
   const connectLedger = useCallback(
@@ -70,7 +66,7 @@ const useAuth = () => {
       words: { "330": string; "118"?: string },
       index = 0,
       bluetooth = false,
-      name = "Ledger"
+      name = "Ledger",
     ) => {
       const wallet = {
         words,
@@ -84,7 +80,7 @@ const useAuth = () => {
       storeWallet(wallet)
       setWallet(wallet as any)
     },
-    [setWallet]
+    [setWallet],
   )
 
   /* connected */
@@ -169,7 +165,7 @@ const useAuth = () => {
     const { words } = wallet
     const address = addressFromWords(
       words[networks[txOptions?.chainID].coinType] ?? "",
-      networks[txOptions?.chainID]?.prefix
+      networks[txOptions?.chainID]?.prefix,
     )
 
     return await lcd.tx.create([{ address }], txOptions)
@@ -179,7 +175,7 @@ const useAuth = () => {
     tx: Tx,
     chainID: string,
     address: AccAddress,
-    password = ""
+    password = "",
   ) => {
     if (!wallet) throw new Error("Wallet is not defined")
 
@@ -191,7 +187,7 @@ const useAuth = () => {
       accountInfo.getAccountNumber(),
       accountInfo.getSequenceNumber(),
       tx.auth_info,
-      tx.body
+      tx.body,
     )
 
     if (is.ledger(wallet)) {
@@ -215,7 +211,7 @@ const useAuth = () => {
         if (!pk[networks[chainID].coinType])
           throw new PasswordError("Incorrect password")
         const key = new RawKey(
-          Buffer.from(pk[networks[chainID].coinType] ?? "", "hex")
+          Buffer.from(pk[networks[chainID].coinType] ?? "", "hex"),
         )
         return await key.createSignatureAmino(doc)
       }
@@ -252,7 +248,7 @@ const useAuth = () => {
         if (!pk[networks[txOptions.chainID].coinType])
           throw new PasswordError("Incorrect password")
         const key = new RawKey(
-          Buffer.from(pk[networks[txOptions.chainID].coinType] ?? "", "hex")
+          Buffer.from(pk[networks[txOptions.chainID].coinType] ?? "", "hex"),
         )
         const w = lcd.wallet(key)
         return await w.createAndSignTx(txOptions)

@@ -23,6 +23,8 @@ import InitChains from "app/InitChains"
 import WithNodeInfo from "app/WithNodeInfo"
 import InitQueryClient from "app/InitQueryClient"
 
+import { setupSentry as initSentry } from "./setupSentry"
+
 initAnalytics()
 
 // if the user is not coming from the desktop app and is visiting the webpage from a large screen
@@ -63,6 +65,6 @@ getInitialConfig().then((defaultNetworks) =>
         </BrowserRouter>
       </RecoilRoot>
     </StrictMode>,
-    document.getElementById("station")
-  )
+    document.getElementById("station"),
+  ),
 )

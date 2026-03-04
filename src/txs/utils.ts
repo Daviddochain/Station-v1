@@ -10,13 +10,15 @@ import axios from "axios"
 // Intercept all axios errors.
 axios.interceptors.response.use(
   (response) => response,
-  (error) => {}
+  (error) => {},
 )
 
 export const getPlaceholder = (decimals = 6) => "0.".padEnd(decimals + 2, "0")
 
 export const toInput = (amount: BigNumber.Value, decimals = 6) =>
-  new BigNumber(readAmount(amount, { decimals })).toNumber()
+  new BigNumber(
+    typeof amount === "bigint" ? amount.toString() : (amount as any),
+  ).toNumber()
 
 /* field array (coins) */
 export interface CoinInput {
@@ -33,7 +35,7 @@ export const getCoins = (coins: CoinInput[], findDecimals?: FindDecimals) => {
         return { amount: toAmount(input, { decimals }), denom }
       })
       .filter(({ amount }) => has(amount))
-      .map(({ amount, denom }) => new Coin(denom, amount))
+      .map(({ amount, denom }) => new Coin(denom, amount)),
   )
 }
 
@@ -45,7 +47,7 @@ export interface TaxParams {
 export const calcTaxes = (
   coins: CoinInput[],
   { taxRate = "0", taxCap = "0" }: TaxParams,
-  isClassic: boolean
+  isClassic: boolean,
 ) => {
   return new Coins(
     coins
@@ -62,7 +64,7 @@ export const calcTaxes = (
 
         if (!tax) throw new Error()
         return new Coin(denom, tax)
-      })
+      }),
   )
 }
 
