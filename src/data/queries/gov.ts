@@ -15,7 +15,7 @@ export const useVotingParams = (chain: string) => {
   return useQuery(
     [queryKey.gov.votingParams, chain],
     () => lcd.gov.votingParameters(chain),
-    { ...RefetchOptions.INFINITY }
+    { ...RefetchOptions.INFINITY },
   )
 }
 
@@ -24,7 +24,7 @@ export const useDepositParams = (chain: string) => {
   return useQuery(
     [queryKey.gov.depositParams, chain],
     () => lcd.gov.depositParameters(chain),
-    { ...RefetchOptions.INFINITY }
+    { ...RefetchOptions.INFINITY },
   )
 }
 
@@ -36,7 +36,7 @@ export const useTallyParams = (chain: string) => {
     () => lcd.gov.tallyParameters(chain),
     {
       ...RefetchOptions.INFINITY,
-    }
+    },
   )
 }
 
@@ -71,7 +71,7 @@ export interface ProposalResult {
     {
       denom: string
       amount: string
-    }
+    },
   ]
   voting_start_time: string
   voting_end_time: string
@@ -108,7 +108,7 @@ export interface ProposalResult46 {
     {
       denom: string
       amount: string
-    }
+    },
   ]
   voting_start_time: string
   voting_end_time: string
@@ -116,6 +116,105 @@ export interface ProposalResult46 {
   title: string
   summary: string
   proposer: string
+}
+
+/* ----------------------------------------------------------
+   Terra Classic LCD fallback (only used when a Classic LCD 500s)
+   ---------------------------------------------------------- */
+
+const CLASSIC_LCD_FALLBACKS = [
+  "https://www.lunaclassicstation.com/lcd",
+  "https://terra-classic-lcd.publicnode.com",
+  "https://lcd-terraclassic.tfl.foundation",
+]
+
+async function getWithFallback(urlPath: string, params?: any) {
+  for (const baseURL of CLASSIC_LCD_FALLBACKS) {
+    try {
+      const res = await axios.get(urlPath, { baseURL, params, timeout: 10000 })
+      return res?.data ?? null
+    } catch (e) {
+      // try next
+    }
+  }
+  return null
+}
+
+/* ----------------------------------------------------------
+   Helpers: safe paginated proposal fetch (prevents 999 -> 500)
+   ---------------------------------------------------------- */
+
+const GOV_PAGE_LIMIT = 100
+const GOV_MAX_PAGES = 50
+
+const isClassicChain = (chainID: string, lcd: string) =>
+  chainID.startsWith("columbus") || lcd.includes("terraclassic")
+
+async function fetchAllProposalsV1(
+  baseURL: string,
+  proposal_status: number,
+): Promise<ProposalResult46[]> {
+  const all: ProposalResult46[] = []
+  let nextKey: string | null = null
+
+  for (let i = 0; i < GOV_MAX_PAGES; i++) {
+    try {
+      const res = await axios.get("/cosmos/gov/v1/proposals", {
+        baseURL,
+        timeout: 12000,
+        params: {
+          "pagination.limit": GOV_PAGE_LIMIT,
+          ...(nextKey ? { "pagination.key": nextKey } : {}),
+          proposal_status,
+        },
+      })
+
+      const data = res?.data
+      const proposals = data?.proposals
+      if (Array.isArray(proposals)) all.push(...proposals)
+
+      nextKey = data?.pagination?.next_key ?? null
+      if (!nextKey) break
+    } catch {
+      // If LCD errors mid-way, return what we have (or empty)
+      return all
+    }
+  }
+
+  return all
+}
+
+async function fetchAllProposalsV1beta1(
+  baseURL: string,
+  proposal_status: number,
+): Promise<ProposalResult[]> {
+  const all: ProposalResult[] = []
+  let nextKey: string | null = null
+
+  for (let i = 0; i < GOV_MAX_PAGES; i++) {
+    try {
+      const res = await axios.get("/cosmos/gov/v1beta1/proposals", {
+        baseURL,
+        timeout: 12000,
+        params: {
+          "pagination.limit": GOV_PAGE_LIMIT,
+          ...(nextKey ? { "pagination.key": nextKey } : {}),
+          proposal_status,
+        },
+      })
+
+      const data = res?.data
+      const proposals = data?.proposals
+      if (Array.isArray(proposals)) all.push(...proposals)
+
+      nextKey = data?.pagination?.next_key ?? null
+      if (!nextKey) break
+    } catch {
+      return all
+    }
+  }
+
+  return all
 }
 
 /* proposals */
@@ -127,70 +226,104 @@ export const useProposals = (status: ProposalStatus) => {
       return {
         queryKey: [queryKey.gov.proposals, lcd, status],
         queryFn: async () => {
+          const proposalStatusNum = Proposal.Status[status]
+
+          // v0.46+ OR Terra2
           if (
             Number(version) >= 0.46 ||
             chainID === "phoenix-1" ||
             chainID === "pisco-1"
           ) {
-            const {
-              data: { proposals },
-            } = await axios.get("/cosmos/gov/v1/proposals", {
-              baseURL: lcd,
-              params: {
-                "pagination.limit": 999,
-                proposal_status: Proposal.Status[status],
-              },
-            })
+            // 1) try primary lcd (paginated, safe)
+            let proposals46: ProposalResult46[] = []
+            try {
+              proposals46 = await fetchAllProposalsV1(lcd, proposalStatusNum)
+            } catch {
+              proposals46 = []
+            }
 
-            const propsParsed = (proposals as ProposalResult46[]).map(
-              (prop) => {
-                return {
-                  ...prop,
-                  proposal_id: prop.id,
-                  content: prop.messages.length
-                    ? prop.messages[0]["@type"] ===
-                      "/cosmos.gov.v1.MsgExecLegacyContent"
-                      ? prop.messages[0].content
-                      : {
-                          ...prop.messages[0],
-                          title: prop.title,
-                          description: prop.summary,
-                        }
+            // 2) Terra Classic fallback (only if classic + primary returned nothing)
+            if (proposals46.length === 0 && isClassicChain(chainID, lcd)) {
+              const fallbackData = await getWithFallback(
+                "/cosmos/gov/v1/proposals",
+                {
+                  "pagination.limit": GOV_PAGE_LIMIT,
+                  proposal_status: proposalStatusNum,
+                },
+              )
+
+              const fallbackProposals = fallbackData?.proposals
+              if (Array.isArray(fallbackProposals)) {
+                proposals46 = fallbackProposals as ProposalResult46[]
+              }
+            }
+
+            const propsParsed = proposals46.map((prop) => {
+              return {
+                ...prop,
+                proposal_id: prop.id,
+                content: prop.messages.length
+                  ? prop.messages[0]["@type"] ===
+                    "/cosmos.gov.v1.MsgExecLegacyContent"
+                    ? (prop.messages[0] as any).content
                     : {
-                        "@type": "/cosmos.gov.v1.TextProposal",
+                        ...(prop.messages[0] as any),
                         title: prop.title,
                         description: prop.summary,
-                      },
-                  final_tally_result: {
-                    yes: prop.final_tally_result.yes_count,
-                    abstain: prop.final_tally_result.abstain_count,
-                    no: prop.final_tally_result.no_count,
-                    no_with_veto: prop.final_tally_result.no_with_veto_count,
-                  },
-                }
+                      }
+                  : {
+                      "@type": "/cosmos.gov.v1.TextProposal",
+                      title: prop.title,
+                      description: prop.summary,
+                    },
+                final_tally_result: {
+                  yes: prop.final_tally_result.yes_count,
+                  abstain: prop.final_tally_result.abstain_count,
+                  no: prop.final_tally_result.no_count,
+                  no_with_veto: prop.final_tally_result.no_with_veto_count,
+                },
               }
-            ) as ProposalResult[]
+            }) as ProposalResult[]
 
             return propsParsed.map((prop) => ({ prop, chain: chainID }))
-          } else {
-            const {
-              data: { proposals },
-            } = await axios.get("/cosmos/gov/v1beta1/proposals", {
-              baseURL: lcd,
-              params: {
-                "pagination.limit": 999,
-                proposal_status: Proposal.Status[status],
-              },
-            })
-            return (proposals as ProposalResult[]).map((prop) => ({
-              prop,
-              chain: chainID,
-            }))
           }
+
+          // legacy v1beta1
+          let proposalsLegacy: ProposalResult[] = []
+          try {
+            proposalsLegacy = await fetchAllProposalsV1beta1(
+              lcd,
+              proposalStatusNum,
+            )
+          } catch {
+            proposalsLegacy = []
+          }
+
+          // Terra Classic fallback if legacy + classic chain
+          if (proposalsLegacy.length === 0 && isClassicChain(chainID, lcd)) {
+            const fallbackData = await getWithFallback(
+              "/cosmos/gov/v1beta1/proposals",
+              {
+                "pagination.limit": GOV_PAGE_LIMIT,
+                proposal_status: proposalStatusNum,
+              },
+            )
+
+            const fallbackProposals = fallbackData?.proposals
+            if (Array.isArray(fallbackProposals)) {
+              proposalsLegacy = fallbackProposals as ProposalResult[]
+            }
+          }
+
+          return proposalsLegacy.map((prop) => ({ prop, chain: chainID }))
         },
+
+        // Keep your defaults but stop retry-spam on flaky LCDs
         ...RefetchOptions.DEFAULT,
+        retry: false,
+        refetchOnWindowFocus: false,
       }
-    })
+    }),
   )
 }
 
@@ -227,7 +360,7 @@ export const useGetProposalStatusItem = () => {
         label: "",
         color: "danger" as Color,
       },
-    }[status])
+    })[status]
 }
 
 export const useProposalStatusItem = (status: ProposalStatus) => {
@@ -241,58 +374,65 @@ export const useProposal = (id: string, chain: string) => {
   return useQuery(
     [queryKey.gov.proposal, id, networks[chain]],
     async () => {
-      if (
-        Number(networks[chain].version) >= 0.46 ||
-        chain === "phoenix-1" ||
-        chain === "pisco-1"
-      ) {
-        const {
-          data: { proposal },
-        } = await axios.get<{ proposal: ProposalResult46 }>(
-          `/cosmos/gov/v1/proposals/${id}`,
-          {
-            baseURL: networks[chain].lcd,
-          }
-        )
+      try {
+        if (
+          Number(networks[chain].version) >= 0.46 ||
+          chain === "phoenix-1" ||
+          chain === "pisco-1"
+        ) {
+          const res = await axios.get<{ proposal: ProposalResult46 }>(
+            `/cosmos/gov/v1/proposals/${id}`,
+            { baseURL: networks[chain].lcd, timeout: 12000 },
+          )
 
-        return {
-          ...proposal,
-          proposal_id: proposal.id,
-          content: proposal.messages.length
-            ? proposal.messages[0]["@type"] ===
-              "/cosmos.gov.v1.MsgExecLegacyContent"
-              ? proposal.messages[0].content
+          const proposal = res?.data?.proposal
+          if (!proposal) throw new Error("Missing proposal")
+
+          return {
+            ...proposal,
+            proposal_id: proposal.id,
+            content: proposal.messages.length
+              ? proposal.messages[0]["@type"] ===
+                "/cosmos.gov.v1.MsgExecLegacyContent"
+                ? (proposal.messages[0] as any).content
+                : {
+                    ...(proposal.messages[0] as any),
+                    title: proposal.title,
+                    description: proposal.summary,
+                  }
               : {
-                  ...proposal.messages[0],
+                  "@type": "/cosmos.gov.v1.TextProposal",
                   title: proposal.title,
                   description: proposal.summary,
-                }
-            : {
-                "@type": "/cosmos.gov.v1.TextProposal",
-                title: proposal.title,
-                description: proposal.summary,
-              },
-          final_tally_result: {
-            yes: proposal.final_tally_result.yes_count,
-            abstain: proposal.final_tally_result.abstain_count,
-            no: proposal.final_tally_result.no_count,
-            no_with_veto: proposal.final_tally_result.no_with_veto_count,
-          },
-        } as ProposalResult
-      } else {
-        const {
-          data: { proposal },
-        } = await axios.get(`/cosmos/gov/v1beta1/proposals/${id}`, {
-          baseURL: networks[chain].lcd,
-        })
+                },
+            final_tally_result: {
+              yes: proposal.final_tally_result.yes_count,
+              abstain: proposal.final_tally_result.abstain_count,
+              no: proposal.final_tally_result.no_count,
+              no_with_veto: proposal.final_tally_result.no_with_veto_count,
+            },
+          } as ProposalResult
+        } else {
+          const res = await axios.get(`/cosmos/gov/v1beta1/proposals/${id}`, {
+            baseURL: networks[chain].lcd,
+            timeout: 12000,
+          })
 
-        return proposal as ProposalResult
+          const proposal = res?.data?.proposal
+          if (!proposal) throw new Error("Missing proposal")
+          return proposal as ProposalResult
+        }
+      } catch {
+        // Keep app stable
+        throw new Error("Failed to fetch proposal")
       }
     },
     {
       ...RefetchOptions.INFINITY,
       enabled: !!networks[chain],
-    }
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
   )
 }
 
@@ -303,7 +443,7 @@ export interface ProposalDeposit {
     {
       denom: string
       amount: string
-    }
+    },
   ]
 }
 
@@ -313,15 +453,22 @@ export const useDeposits = (id: string, chain: string) => {
   return useQuery(
     [queryKey.gov.deposits, id, chain],
     async () => {
-      const {
-        data: { deposits },
-      } = await axios.get(`/cosmos/gov/v1beta1/proposals/${id}/deposits`, {
-        baseURL: networks[chain].lcd,
-      })
+      try {
+        const res = await axios.get(
+          `/cosmos/gov/v1beta1/proposals/${id}/deposits`,
+          {
+            baseURL: networks[chain].lcd,
+            timeout: 12000,
+          },
+        )
 
-      return deposits as ProposalDeposit[]
+        const deposits = res?.data?.deposits
+        return (Array.isArray(deposits) ? deposits : []) as ProposalDeposit[]
+      } catch {
+        return [] as ProposalDeposit[]
+      }
     },
-    { ...RefetchOptions.DEFAULT }
+    { ...RefetchOptions.DEFAULT, retry: false, refetchOnWindowFocus: false },
   )
 }
 
@@ -332,7 +479,7 @@ export const useTally = (id: string, chain: string) => {
     () => lcd.gov.tally(Number(id), chain),
     {
       ...RefetchOptions.DEFAULT,
-    }
+    },
   )
 }
 
@@ -366,7 +513,7 @@ export const useGetVoteOptionItem = () => {
         label: "",
         color: "danger" as Color,
       },
-    }[status])
+    })[status]
 
   return (param: Vote.Option | string) => {
     const option = typeof param === "string" ? Vote.Option[param as any] : param

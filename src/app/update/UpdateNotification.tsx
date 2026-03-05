@@ -1,3 +1,5 @@
+// src/app/update/UpdateNotification.tsx
+
 import { RefetchOptions } from "data/query"
 import { useQuery } from "react-query"
 import styles from "./UpdateNotification.module.scss"
@@ -5,36 +7,61 @@ import { useTranslation } from "react-i18next"
 import axios from "axios"
 import { useEffect, useRef, useState } from "react"
 
+const isDev =
+  typeof process !== "undefined" && process.env?.NODE_ENV === "development"
+
 const useCommithash = (disabled: boolean) => {
   return useQuery(
-    [],
+    ["commit_hash"],
     async () => {
-      // fetch commit_hash file created at build time
-      const { data: commit_hash } = await axios.get("/commit_hash")
-      return commit_hash
+      try {
+        // commit_hash file is typically created at build time (public/commit_hash)
+        const res = await axios.get("/commit_hash", {
+          timeout: 5_000,
+          // avoid cached stale in prod when checking for updates
+          headers: { "Cache-Control": "no-cache" },
+        })
+        return (res?.data ?? "").toString().trim()
+      } catch (e: any) {
+        const status = e?.response?.status
+
+        // In dev (or if not configured), commit_hash file may not exist.
+        // Treat as "not available" instead of throwing / spamming console.
+        if (status === 404) return null
+
+        // Any other failure: also treat as unavailable
+        return null
+      }
     },
-    { ...RefetchOptions.DEFAULT, enabled: !disabled }
+    {
+      ...RefetchOptions.DEFAULT,
+      enabled: !disabled && !isDev, // disable completely in dev to stop spam
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
   )
 }
 
 export default function UpdateNotification() {
-  const old_commit_hash = useRef<string>()
+  const old_commit_hash = useRef<string | null>(null)
   const { t } = useTranslation()
-  const [showNotification, setShownotification] = useState<boolean>(false)
+  const [showNotification, setShownotification] = useState(false)
+
   const { data: commit_hash } = useCommithash(showNotification)
 
   useEffect(() => {
     if (showNotification) return
+
+    // If commit_hash is not available (null), do nothing
+    if (!commit_hash) return
+
     if (!old_commit_hash.current) old_commit_hash.current = commit_hash
 
     setShownotification(old_commit_hash.current !== commit_hash)
   }, [commit_hash, showNotification])
 
-  // no update available or request still in progress
-  // (comment out next line to test)
   if (!showNotification) return null
 
-  // update available
   return (
     <div className={styles.notification}>
       {t("There is a new version available")}

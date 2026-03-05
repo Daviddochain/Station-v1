@@ -1,5 +1,5 @@
 import { StrictMode } from "react"
-import { render } from "react-dom"
+import { createRoot } from "react-dom/client"
 import { BrowserRouter } from "react-router-dom"
 import { ReactQueryDevtools } from "react-query/devtools"
 import { RecoilRoot } from "recoil"
@@ -37,8 +37,18 @@ if (!navigator.userAgent.includes("Electron") && window.innerWidth > 992) {
   */
 }
 
-getInitialConfig().then((defaultNetworks) =>
-  render(
+getInitialConfig().then((defaultNetworks) => {
+  const el = document.getElementById("station")
+
+  if (!el) {
+    // Avoid crashing if the HTML id changes
+    console.error('Root element "#station" not found')
+    return
+  }
+
+  const root = createRoot(el)
+
+  root.render(
     <StrictMode>
       <RecoilRoot>
         <BrowserRouter>
@@ -65,6 +75,5 @@ getInitialConfig().then((defaultNetworks) =>
         </BrowserRouter>
       </RecoilRoot>
     </StrictMode>,
-    document.getElementById("station"),
-  ),
-)
+  )
+})

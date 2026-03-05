@@ -31,6 +31,9 @@ const OtherChainsButton = ({ list, handleSetChain }: Props) => {
     closePopover()
   }
 
+  // ✅ Important: don't mount Popover/Tippy with "undefined" children then later a button
+  if (!list.length) return null
+
   return (
     <Popover
       className={styles.popover}
@@ -40,9 +43,7 @@ const OtherChainsButton = ({ list, handleSetChain }: Props) => {
       placement="bottom"
       content={<SimpleChainList onClick={onClick} list={list} />}
     >
-      {list.length ? (
-        <button className={styles.button}>+ {list.length}</button>
-      ) : undefined}
+      <button className={styles.button}>+ {list.length}</button>
     </Popover>
   )
 }
