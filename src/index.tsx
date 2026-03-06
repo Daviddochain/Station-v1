@@ -1,5 +1,5 @@
 import { StrictMode } from "react"
-import { render } from "react-dom"
+import { createRoot } from "react-dom/client"
 import { BrowserRouter } from "react-router-dom"
 import { ReactQueryDevtools } from "react-query/devtools"
 import { RecoilRoot } from "recoil"
@@ -26,6 +26,7 @@ import InitQueryClient from "app/InitQueryClient"
 import { setupSentry as initSentry } from "./setupSentry"
 
 initAnalytics()
+initSentry()
 
 // if the user is not coming from the desktop app and is visiting the webpage from a large screen
 if (!navigator.userAgent.includes("Electron") && window.innerWidth > 992) {
@@ -37,8 +38,16 @@ if (!navigator.userAgent.includes("Electron") && window.innerWidth > 992) {
   */
 }
 
-getInitialConfig().then((defaultNetworks) =>
-  render(
+const container = document.getElementById("station")
+
+if (!container) {
+  throw new Error('Root element with id "station" was not found')
+}
+
+const root = createRoot(container)
+
+getInitialConfig().then((defaultNetworks) => {
+  root.render(
     <StrictMode>
       <RecoilRoot>
         <BrowserRouter>
@@ -65,6 +74,5 @@ getInitialConfig().then((defaultNetworks) =>
         </BrowserRouter>
       </RecoilRoot>
     </StrictMode>,
-    document.getElementById("station"),
-  ),
-)
+  )
+})

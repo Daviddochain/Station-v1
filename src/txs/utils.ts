@@ -1,4 +1,4 @@
-import { readAmount, toAmount } from "@terra-money/terra-utils"
+import { toAmount } from "@terra-money/terra-utils"
 import { Coin, Coins } from "@terra-money/feather.js"
 import { getShouldTax } from "data/queries/treasury"
 import { FindDecimals } from "./IBCHelperContext"
