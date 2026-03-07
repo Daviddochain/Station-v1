@@ -35,45 +35,49 @@ interface IOsmosisPoolResponse {
  * @returns a map of token name strings indexed by gamm denom
  */
 export const useGammTokens = () => {
-  const fetch = useQuery(
+  const fetch = useQuery<IOsmosisPoolResponse>(
     [queryKey.gammTokens],
     async () => {
       try {
-        const { data } = await request.get<IOsmosisPoolResponse>(
+        const response = await request.get<IOsmosisPoolResponse>(
           "/pools/v2/all?low_liquidity=true",
-          { baseURL: OSMOSIS_API_URL }
+          { baseURL: OSMOSIS_API_URL },
         )
 
+        const data = response?.data
+
         if (!data || typeof data !== "object") {
-          throw new Error("Invalid API response format")
+          console.error("Invalid Osmosis API response format")
+          return {}
         }
 
         return data
       } catch (error) {
-        console.error(error)
-        return
+        console.error("Failed to fetch Osmosis pool data:", error)
+        return {}
       }
     },
     {
       // Data will never become stale and always stay in cache
       cacheTime: Infinity,
       staleTime: Infinity,
-    }
+    },
   )
 
   const gammTokens = new Map<string, string>()
 
-  if (fetch.data) {
+  if (fetch.data && typeof fetch.data === "object") {
     for (const [poolId, poolAsset] of Object.entries(fetch.data)) {
       if (Array.isArray(poolAsset)) {
         gammTokens.set(
           "gamm/pool/" + poolId,
-          poolAsset.map((asset) => asset.symbol).join("-") + " LP"
+          poolAsset.map((asset) => asset.symbol).join("-") + " LP",
         )
       } else {
-        console.error("Invalid API response format")
+        console.error("Invalid pool asset format for pool:", poolId)
       }
     }
   }
+
   return gammTokens
 }

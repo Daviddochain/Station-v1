@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { useForm } from "react-hook-form"
 import PersonIcon from "@mui/icons-material/Person"
-import { AccAddress } from "@terra-money/feather.js"
-import { MsgExecuteContract } from "@terra-money/feather.js"
+import { AccAddress, MsgExecuteContract } from "@terra-money/feather.js"
 import { truncate } from "@terra-money/terra-utils"
 import { SAMPLE_ADDRESS } from "config/constants"
 import { queryKey } from "data/query"
@@ -18,10 +17,15 @@ import Tx from "../Tx"
 import { getChainIDFromAddress } from "utils/bech32"
 import { useInterchainAddresses } from "auth/hooks/useAddress"
 
-interface TxValues {
-  recipient?: string // AccAddress | TNS
-  address?: AccAddress // hidden input
+interface AddressBook {
+  recipient: string
   memo?: string
+}
+
+interface TxValues {
+  recipient: string
+  address: string
+  memo: string
 }
 
 interface Props {
@@ -36,51 +40,72 @@ const TransferCW721Form = ({ contract, id }: Props) => {
   const chainID = getChainIDFromAddress(contract, network) ?? ""
   const connectedAddress = addresses?.[chainID]
 
-  /* form */
-  const form = useForm<TxValues>({ mode: "onChange" })
-  const { register, trigger, watch, setValue, setError, handleSubmit } = form
-  const { formState } = form
-  const { errors } = formState
+  const form = useForm<TxValues>({
+    mode: "onChange",
+    defaultValues: {
+      recipient: "",
+      address: "",
+      memo: "",
+    },
+  })
+
+  const {
+    register,
+    trigger,
+    watch,
+    setValue,
+    setError,
+    clearErrors,
+    handleSubmit,
+    formState: { errors },
+  } = form
+
   const { recipient, memo } = watch()
 
   const onClickAddressBookItem = async ({ recipient, memo }: AddressBook) => {
-    setValue("recipient", recipient)
-    setValue("memo", memo)
+    setValue("recipient", recipient, {
+      shouldValidate: true,
+      shouldDirty: true,
+    })
+    setValue("memo", memo ?? "", { shouldDirty: true })
     await trigger("recipient")
   }
 
-  /* resolve recipient */
-  const { data: resolvedAddress, ...tnsState } = useTnsAddress(recipient ?? "")
+  const { data: resolvedAddress, ...tnsState } = useTnsAddress(recipient)
+
   useEffect(() => {
     if (!recipient) {
-      setValue("address", undefined)
+      setValue("address", "", { shouldValidate: false })
+      clearErrors("recipient")
     } else if (AccAddress.validate(recipient)) {
-      setValue("address", recipient)
+      setValue("address", recipient, { shouldValidate: false })
+      clearErrors("recipient")
     } else if (resolvedAddress) {
-      setValue("address", resolvedAddress)
+      setValue("address", resolvedAddress, { shouldValidate: false })
+      clearErrors("recipient")
     } else {
-      setValue("address", recipient)
+      setValue("address", "", { shouldValidate: false })
     }
-  }, [form, recipient, resolvedAddress, setValue])
+  }, [recipient, resolvedAddress, setValue, clearErrors])
 
-  // validate(tns): not found
-  const invalid =
-    recipient?.endsWith(".ust") && !tnsState.isLoading && !resolvedAddress
+  const invalid: string | false =
+    recipient.endsWith(".ust") && !tnsState.isLoading && !resolvedAddress
       ? t("Address not found")
-      : ""
+      : false
 
-  const disabled =
-    invalid || (tnsState.isLoading && t("Searching for address..."))
+  const disabled: string | false =
+    invalid || (tnsState.isLoading ? t("Searching for address...") : false)
 
   useEffect(() => {
-    if (invalid) setError("recipient", { type: "invalid", message: invalid })
+    if (invalid) {
+      setError("recipient", { type: "invalid", message: invalid })
+    }
   }, [invalid, setError])
 
-  /* tx */
   const createTx = useCallback(
     ({ address, memo }: TxValues) => {
       if (!connectedAddress) return
-      if (!(address && AccAddress.validate(address))) return
+      if (!address || !AccAddress.validate(address)) return
 
       const msgs = [
         new MsgExecuteContract(connectedAddress, contract, {
@@ -90,13 +115,16 @@ const TransferCW721Form = ({ contract, id }: Props) => {
 
       return { msgs, memo, chainID }
     },
-    [connectedAddress, chainID, contract, id]
+    [connectedAddress, contract, id, chainID],
   )
 
-  /* fee */
   const estimationTxValues = useMemo(
-    () => ({ address: connectedAddress }),
-    [connectedAddress]
+    () => ({
+      recipient: connectedAddress ?? "",
+      address: connectedAddress ?? "",
+      memo: "",
+    }),
+    [connectedAddress],
   )
 
   const tx = {
@@ -115,6 +143,7 @@ const TransferCW721Form = ({ contract, id }: Props) => {
 
   const renderResolvedAddress = () => {
     if (!resolvedAddress) return null
+
     return (
       <InlineFlex gap={4} className="success">
         <PersonIcon fontSize="inherit" />
@@ -139,6 +168,7 @@ const TransferCW721Form = ({ contract, id }: Props) => {
                 >
                   <Input
                     {...register("recipient", {
+                      required: t("Recipient is required"),
                       validate: validate.recipient(),
                     })}
                     placeholder={SAMPLE_ADDRESS}

@@ -1,3 +1,5 @@
+// src/pages/wallet/NetWorth.tsx
+
 import { ReactComponent as ReceiveIcon } from "styles/images/icons/Receive_v2.svg"
 import { ReactComponent as SendIcon } from "styles/images/icons/Send_v2.svg"
 import { ReactComponent as AddIcon } from "styles/images/icons/Buy_v2.svg"
@@ -35,27 +37,34 @@ const NetWorth = () => {
 
   const networks = useNetwork()
   const chainID = useChainID()
-  const availableGasDenoms = useMemo(() => {
-    return Object.keys(networks[chainID]?.gasPrices)
-  }, [chainID, networks])
-  const sendButtonDisabled = isWalletEmpty && !!availableGasDenoms.length
 
-  // TODO: show CW20 balances and staked tokens
-  const coinsValue = coins?.reduce((acc, { amount, denom }) => {
-    const { token, decimals, symbol } = readNativeDenom(denom)
-    return (
-      acc +
-      (parseInt(amount) *
-        (symbol?.endsWith("...") ? 0 : prices?.[token]?.price ?? 0)) /
-        Math.pow(10, decimals)
-    )
-  }, 0)
+  const availableGasDenoms = useMemo(() => {
+    const gasPrices = networks?.[chainID]?.gasPrices
+    return gasPrices ? Object.keys(gasPrices) : []
+  }, [chainID, networks])
+
+  const sendButtonDisabled = !!isWalletEmpty && availableGasDenoms.length > 0
+
+  const coinsValue =
+    coins?.reduce((acc, { amount, denom }) => {
+      const nativeDenom = readNativeDenom(denom)
+
+      const token = nativeDenom?.token ?? denom
+      const decimals = nativeDenom?.decimals ?? 6
+      const symbol = nativeDenom?.symbol ?? denom
+
+      const parsedAmount = Number(amount ?? 0)
+      const price = symbol?.endsWith("...") ? 0 : (prices?.[token]?.price ?? 0)
+
+      return acc + (parsedAmount * price) / Math.pow(10, decimals)
+    }, 0) ?? 0
 
   return (
     <article className={styles.networth}>
       <TooltipIcon content={<NetWorthTooltip />} placement="bottom">
         <p>{capitalize(t("portfolio value"))}</p>
       </TooltipIcon>
+
       <h1>
         {currency.symbol}{" "}
         <Read
@@ -66,6 +75,7 @@ const NetWorth = () => {
           denom=""
         />
       </h1>
+
       <div className={styles.networth__buttons}>
         <div className={styles.button__wrapper}>
           <Button
@@ -83,6 +93,7 @@ const NetWorth = () => {
           </Button>
           <h3>{capitalize(t("send"))}</h3>
         </div>
+
         <div className={styles.button__wrapper}>
           <Button
             className={styles.wallet_default}
@@ -97,6 +108,7 @@ const NetWorth = () => {
           </Button>
           <h3>{capitalize(t("receive"))}</h3>
         </div>
+
         {addresses && networkName === "mainnet" && (
           <div className={styles.button__wrapper}>
             <ModalButton

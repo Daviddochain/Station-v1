@@ -27,7 +27,7 @@ const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
         "/chains.json",
         {
           baseURL: STATION_ASSETS,
-        }
+        },
       )
 
       if (chains?.mainnet?.["noble-1"]) {
@@ -40,14 +40,12 @@ const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
   }, [])
 
   const testBase = networks
-    ? Object.values(
-        {
-          ...networks.mainnet,
-          ...networks.testnet,
-          ...networks.classic,
-          ...networks.localterra,
-        } ?? {}
-      ).map((chain) => {
+    ? Object.values({
+        ...networks.mainnet,
+        ...networks.testnet,
+        ...networks.classic,
+        ...networks.localterra,
+      }).map((chain) => {
         const lcd = customLCDs[chain?.chainID] ?? chain.lcd
         return { ...chain, lcd }
       })
@@ -57,7 +55,7 @@ const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
 
   const validNetworks = validationResult.reduce(
     (acc, { data }) => (data ? [...acc, data] : acc),
-    [] as string[]
+    [] as string[],
   )
 
   const validationState = combineState(...validationResult)
@@ -75,14 +73,14 @@ const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
               Object.fromEntries(
                 Object.entries(networks ?? {}).filter(
                   ([chainID]) =>
-                    chainID === "localterra" || validNetworks.includes(chainID)
-                ) ?? {}
+                    chainID === "localterra" || validNetworks.includes(chainID),
+                ),
               ),
             filterDisabledNetworks: (networks) =>
               Object.fromEntries(
                 Object.entries(networks ?? {}).filter(
-                  ([chainID]) => !validNetworks.includes(chainID)
-                ) ?? {}
+                  ([chainID]) => !validNetworks.includes(chainID),
+                ),
               ),
           }}
         >
