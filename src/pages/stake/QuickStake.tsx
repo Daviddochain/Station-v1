@@ -45,31 +45,36 @@ const QuickStake = () => {
   const alliancesData = useAllAlliances()
   const alliances = alliancesData.reduce(
     (acc, { data }) => (data ? [...acc, ...data] : acc),
-    allianceHubAssets.data ? allianceHubAssets.data : ([] as AllianceDetails[])
+    allianceHubAssets.data ? allianceHubAssets.data : ([] as AllianceDetails[]),
   )
 
   const stakingParamsData = useAllStakingParams()
   const unbondingtime = stakingParamsData.reduce(
     (acc, { data }) =>
-      data ? { ...acc, [data?.chainID]: data.unbonding_time ?? 0 } : acc,
-    {} as Record<string, number>
+      data && "unbonding_time" in data
+        ? { ...acc, [data.chainID]: data.unbonding_time ?? 0 }
+        : acc,
+    {} as Record<string, number>,
   )
+
   const delegationsData = useInterchainDelegations()
   const delegations: Delegation[] = delegationsData.reduce(
-    (acc, { data }) => (data ? [...data?.delegation, ...acc] : acc),
-    [] as Delegation[]
+    (acc, { data }) => (data ? [...data.delegation, ...acc] : acc),
+    [] as Delegation[],
   )
+
   const alliancesHubDelegations = allianceHub.useDelegations()
   const alliancesDelegationsData = useInterchainAllianceDelegations()
   const alliancesDelegations = alliancesDelegationsData.reduce(
     (acc, { data }) => (data ? [data, ...acc] : acc),
-    alliancesHubDelegations.data ? alliancesHubDelegations.data : []
+    alliancesHubDelegations.data ? alliancesHubDelegations.data : [],
   )
+
   const state = combineState(
     ...alliancesData,
     ...stakingParamsData,
     ...delegationsData,
-    ...alliancesDelegationsData
+    ...alliancesDelegationsData,
   )
 
   const options = [
@@ -89,42 +94,46 @@ const QuickStake = () => {
     })),
     ...(alliances ?? []).map(
       ({ denom, reward_weight, chainID, stakeOnAllianceHub }) => ({
-        denom: denom,
+        denom,
         rewards: Number(reward_weight),
         chainID,
         unbonding: stakeOnAllianceHub
           ? 0
           : (unbondingtime[chainID] ?? 0) / 60 / 60 / 24,
         isAlliance: true,
-        stakeOnAllianceHub: stakeOnAllianceHub,
+        stakeOnAllianceHub,
         hasDelegations: alliancesDelegations.some(
           ({ chainID: delChainID, delegations }) => {
             const isSameID = delChainID === chainID
             const isPositiveBalance = delegations.some(
               (del: any) =>
-                del.balance?.denom === denom && Number(del.balance?.amount) > 0
+                del.balance?.denom === denom && Number(del.balance?.amount) > 0,
             )
 
             return isSameID && isPositiveBalance
-          }
+          },
         ),
-      })
+      }),
     ),
   ]
 
-  const tokenList = options.reduce((acc, { denom }) => {
-    const token = readNativeDenom(denom)
-    if (token.type === TokenType.IBC) return acc
-    return token.lsd
-      ? {
-          [token.lsd]: readNativeDenom(token.lsd),
-          ...acc,
-        }
-      : {
-          [token.token]: token,
-          ...acc,
-        }
-  }, {} as Record<string, TokenInterface>)
+  const tokenList = options.reduce(
+    (acc, { denom }) => {
+      const token = readNativeDenom(denom)
+      if (token.type === TokenType.IBC) return acc
+
+      return token.lsd
+        ? {
+            [token.lsd]: readNativeDenom(token.lsd),
+            ...acc,
+          }
+        : {
+            [token.token]: token,
+            ...acc,
+          }
+    },
+    {} as Record<string, TokenInterface>,
+  )
 
   return (
     <Page sub {...state}>
@@ -136,13 +145,14 @@ const QuickStake = () => {
           onChange={setToken}
         />
       </header>
+
       <main className={styles.table__container}>
         <Table
           dataSource={options.filter(
             ({ denom }) =>
               !token ||
               readNativeDenom(denom).token === token ||
-              readNativeDenom(denom).lsd === token
+              readNativeDenom(denom).lsd === token,
           )}
           columns={[
             {
@@ -173,6 +183,7 @@ const QuickStake = () => {
                             />
                           )}
                         </div>
+
                         {token.symbol}
 
                         <span className={styles.alliance__logo}>
@@ -187,7 +198,7 @@ const QuickStake = () => {
                                   <h1>Alliance</h1>
                                   <p>
                                     {t(
-                                      "Assets of one chain can be staked on another, creating a mutually-beneficial economic partnership through interchain staking"
+                                      "Assets of one chain can be staked on another, creating a mutually-beneficial economic partnership through interchain staking",
                                     )}
                                   </p>
                                 </article>
@@ -239,7 +250,7 @@ const QuickStake = () => {
                   isAlliance,
                   hasDelegations,
                   stakeOnAllianceHub,
-                }
+                },
               ) => (
                 <Flex start gap={8}>
                   <ModalButton
@@ -258,7 +269,7 @@ const QuickStake = () => {
                       unbonding,
                       isAlliance,
                       hasDelegations,
-                      stakeOnAllianceHub
+                      stakeOnAllianceHub,
                     )}
                   </ModalButton>
                 </Flex>

@@ -13,6 +13,7 @@ import { useAlliance, useAllianceDelegations } from "data/queries/alliance"
 import { combineState } from "data/query"
 import { ReadToken } from "components/token"
 import { ChainFeature } from "types/chains"
+import { Delegation } from "@terra-money/feather.js"
 
 const cx = classNames.bind(styles)
 
@@ -34,31 +35,33 @@ const StakingDetailsCompact = ({
   const { data: alliance, ...allianceState } = useAlliance(
     chainID,
     denom,
-    !isAlliance
+    !isAlliance,
   )
 
   const { data: delegations, ...delegationsState } = useDelegations(
     chainID,
-    isAlliance
+    isAlliance,
   )
   const { data: allianceDelegations, ...allianceDelegationsState } =
     useAllianceDelegations(chainID, !isAlliance)
 
   const delegated = isAlliance
     ? allianceDelegations?.reduce(
-        (acc, { balance: amount }) => acc + Number(amount),
-        0
+        (acc: number, { balance: amount }: { balance: any }) =>
+          acc + Number(amount),
+        0,
       )
     : delegations?.reduce(
-        (acc, { balance }) => acc + balance.amount.toNumber(),
-        0
+        (acc: number, { balance }: Delegation) =>
+          acc + balance.amount.toNumber(),
+        0,
       )
 
   const state = combineState(
     stakeState,
     allianceState,
     delegationsState,
-    allianceDelegationsState
+    allianceDelegationsState,
   )
 
   return (
@@ -90,12 +93,14 @@ const StakingDetailsCompact = ({
 
             {isAlliance && <span className={styles.alliance__logo}>🤝</span>}
           </Flex>
+
           <div className={styles.staking__details__container}>
             <dl>
               <dt>{t("Unbonding period")}:</dt>
               <dd>{t("{{value}} days", { value: daysToUnbond })}</dd>
             </dl>
           </div>
+
           {!!delegated && (
             <div className={styles.staking__details__container}>
               <h4>{t("My Staked Position")}</h4>

@@ -10,12 +10,46 @@ import { useNetworkWithFeature } from "data/wallet"
 import axios from "axios"
 import { ChainFeature } from "types/chains"
 
+const isBrowser = typeof window !== "undefined"
+
+const parseURL = (value?: string) => {
+  if (!value) return null
+
+  try {
+    return new URL(value)
+  } catch {
+    return null
+  }
+}
+
+const isLocalHost = (hostname: string) => {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0"
+  )
+}
+
+const canBrowserCallLCD = (lcd?: string) => {
+  const target = parseURL(lcd)
+  if (!target) return false
+  if (!isBrowser) return true
+
+  const current = parseURL(window.location.origin)
+  if (!current) return false
+
+  if (target.origin === current.origin) return true
+  if (isLocalHost(target.hostname) && isLocalHost(current.hostname)) return true
+
+  return false
+}
+
 export const useVotingParams = (chain: string) => {
   const lcd = useInterchainLCDClient()
   return useQuery(
     [queryKey.gov.votingParams, chain],
     () => lcd.gov.votingParameters(chain),
-    { ...RefetchOptions.INFINITY }
+    { ...RefetchOptions.INFINITY },
   )
 }
 
@@ -24,7 +58,7 @@ export const useDepositParams = (chain: string) => {
   return useQuery(
     [queryKey.gov.depositParams, chain],
     () => lcd.gov.depositParameters(chain),
-    { ...RefetchOptions.INFINITY }
+    { ...RefetchOptions.INFINITY },
   )
 }
 
@@ -36,7 +70,7 @@ export const useTallyParams = (chain: string) => {
     () => lcd.gov.tallyParameters(chain),
     {
       ...RefetchOptions.INFINITY,
-    }
+    },
   )
 }
 
@@ -71,7 +105,7 @@ export interface ProposalResult {
     {
       denom: string
       amount: string
-    }
+    },
   ]
   voting_start_time: string
   voting_end_time: string
@@ -108,7 +142,7 @@ export interface ProposalResult46 {
     {
       denom: string
       amount: string
-    }
+    },
   ]
   voting_start_time: string
   voting_end_time: string
@@ -124,9 +158,13 @@ export const useProposals = (status: ProposalStatus) => {
 
   return useQueries(
     Object.values(networks ?? {}).map(({ lcd, version, chainID }) => {
+      const enabled = !!lcd && !!chainID && canBrowserCallLCD(lcd)
+
       return {
         queryKey: [queryKey.gov.proposals, lcd, status],
         queryFn: async () => {
+          if (!enabled) return []
+
           if (
             Number(version) >= 0.46 ||
             chainID === "phoenix-1" ||
@@ -168,7 +206,7 @@ export const useProposals = (status: ProposalStatus) => {
                     no_with_veto: prop.final_tally_result.no_with_veto_count,
                   },
                 }
-              }
+              },
             ) as ProposalResult[]
 
             return propsParsed.map((prop) => ({ prop, chain: chainID }))
@@ -182,15 +220,19 @@ export const useProposals = (status: ProposalStatus) => {
                 proposal_status: Proposal.Status[status],
               },
             })
+
             return (proposals as ProposalResult[]).map((prop) => ({
               prop,
               chain: chainID,
             }))
           }
         },
+        enabled,
+        retry: false,
+        refetchOnWindowFocus: false,
         ...RefetchOptions.DEFAULT,
       }
-    })
+    }),
   )
 }
 
@@ -227,7 +269,7 @@ export const useGetProposalStatusItem = () => {
         label: "",
         color: "danger" as Color,
       },
-    }[status])
+    })[status]
 }
 
 export const useProposalStatusItem = (status: ProposalStatus) => {
@@ -238,11 +280,16 @@ export const useProposalStatusItem = (status: ProposalStatus) => {
 /* proposal */
 export const useProposal = (id: string, chain: string) => {
   const networks = useNetworkWithFeature(ChainFeature.GOV)
+  const network = networks?.[chain]
+  const enabled = !!network && canBrowserCallLCD(network?.lcd)
+
   return useQuery(
-    [queryKey.gov.proposal, id, networks[chain]],
+    [queryKey.gov.proposal, id, network],
     async () => {
+      if (!network) return undefined
+
       if (
-        Number(networks[chain].version) >= 0.46 ||
+        Number(network.version) >= 0.46 ||
         chain === "phoenix-1" ||
         chain === "pisco-1"
       ) {
@@ -251,8 +298,8 @@ export const useProposal = (id: string, chain: string) => {
         } = await axios.get<{ proposal: ProposalResult46 }>(
           `/cosmos/gov/v1/proposals/${id}`,
           {
-            baseURL: networks[chain].lcd,
-          }
+            baseURL: network.lcd,
+          },
         )
 
         return {
@@ -283,7 +330,7 @@ export const useProposal = (id: string, chain: string) => {
         const {
           data: { proposal },
         } = await axios.get(`/cosmos/gov/v1beta1/proposals/${id}`, {
-          baseURL: networks[chain].lcd,
+          baseURL: network.lcd,
         })
 
         return proposal as ProposalResult
@@ -291,8 +338,10 @@ export const useProposal = (id: string, chain: string) => {
     },
     {
       ...RefetchOptions.INFINITY,
-      enabled: !!networks[chain],
-    }
+      enabled,
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
   )
 }
 
@@ -303,25 +352,35 @@ export interface ProposalDeposit {
     {
       denom: string
       amount: string
-    }
+    },
   ]
 }
 
 /* proposal: deposits */
 export const useDeposits = (id: string, chain: string) => {
   const networks = useNetworkWithFeature(ChainFeature.GOV)
+  const network = networks?.[chain]
+  const enabled = !!network && canBrowserCallLCD(network?.lcd)
+
   return useQuery(
     [queryKey.gov.deposits, id, chain],
     async () => {
+      if (!network) return [] as ProposalDeposit[]
+
       const {
         data: { deposits },
       } = await axios.get(`/cosmos/gov/v1beta1/proposals/${id}/deposits`, {
-        baseURL: networks[chain].lcd,
+        baseURL: network.lcd,
       })
 
       return deposits as ProposalDeposit[]
     },
-    { ...RefetchOptions.DEFAULT }
+    {
+      ...RefetchOptions.DEFAULT,
+      enabled,
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
   )
 }
 
@@ -332,7 +391,7 @@ export const useTally = (id: string, chain: string) => {
     () => lcd.gov.tally(Number(id), chain),
     {
       ...RefetchOptions.DEFAULT,
-    }
+    },
   )
 }
 
@@ -366,7 +425,7 @@ export const useGetVoteOptionItem = () => {
         label: "",
         color: "danger" as Color,
       },
-    }[status])
+    })[status]
 
   return (param: Vote.Option | string) => {
     const option = typeof param === "string" ? Vote.Option[param as any] : param

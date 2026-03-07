@@ -69,46 +69,46 @@ const SendPage = () => {
   const availableAssets = useMemo(
     () =>
       Object.values(
-        (balances ?? []).reduce((acc, { denom, amount, chain }) => {
-          const data = readNativeDenom(denom, chain)
-          // TODO: resolve ibc lun(a|c) balances better at balance fetch
-          // then update max / balance / messaging to translate lun(a|c)
-          // for now, check if token is LUNC and network isn't classic, discard if so
-          if (data?.symbol === "LUNC" && networkName !== "classic")
-            return acc as Record<string, AssetType>
+        (balances ?? []).reduce(
+          (acc, { denom, amount, chain }) => {
+            const data = readNativeDenom(denom, chain)
 
-          if (acc[data.token]) {
-            acc[data.token].balance = `${
-              parseInt(acc[data.token].balance) + parseInt(amount)
-            }`
-            acc[data.token].chains.push(chain)
-            return acc as Record<string, AssetType>
-          } else {
-            return {
-              ...acc,
-              [data.token]: {
-                denom: data.token,
-                balance: amount,
-                icon: data.icon,
-                symbol: data.symbol,
-                price: prices?.[data.token]?.price ?? 0,
-                chains: [chain],
-              },
-            } as Record<string, AssetType>
-          }
-        }, {} as Record<string, AssetType>) ?? {}
+            if (data?.symbol === "LUNC" && networkName !== "classic")
+              return acc as Record<string, AssetType>
+
+            if (acc[data.token]) {
+              acc[data.token].balance = `${
+                parseInt(acc[data.token].balance) + parseInt(amount)
+              }`
+              acc[data.token].chains.push(chain)
+              return acc as Record<string, AssetType>
+            } else {
+              return {
+                ...acc,
+                [data.token]: {
+                  denom: data.token,
+                  balance: amount,
+                  icon: data.icon,
+                  symbol: data.symbol,
+                  price: prices?.[data.token]?.price ?? 0,
+                  chains: [chain],
+                },
+              } as Record<string, AssetType>
+            }
+          },
+          {} as Record<string, AssetType>,
+        ) ?? {},
       ).sort(
-        (a, b) => b.price * parseInt(b.balance) - a.price * parseInt(a.balance)
+        (a, b) => b.price * parseInt(b.balance) - a.price * parseInt(a.balance),
       ),
-    [balances, readNativeDenom, networkName, prices]
+    [balances, readNativeDenom, networkName, prices],
   )
 
   const filteredAssets = useMemo(
     () => availableAssets.filter(({ symbol }) => !symbol.endsWith("...")),
-    [availableAssets]
+    [availableAssets],
   )
 
-  /* form */
   const form = useForm<TxValues>({ mode: "onChange" })
   const { register, trigger, watch, setValue, handleSubmit, reset } = form
   const { formState } = form
@@ -123,14 +123,13 @@ const SendPage = () => {
   } = watch()
 
   const decimals = asset ? readNativeDenom(asset).decimals : 6
-
   const amount = toAmount(input, { decimals })
 
-  const defaultAsset = route?.denom || filteredAssets[0].denom
+  const defaultAsset = route?.denom || filteredAssets[0]?.denom
 
   const availableChains = useMemo(() => {
     const chainsFromAsset = availableAssets.find(
-      ({ denom }) => denom === (asset ?? defaultAsset)
+      ({ denom }) => denom === (asset ?? defaultAsset),
     )?.chains
 
     const uniqueChains = Array.from(new Set(chainsFromAsset))
@@ -145,17 +144,15 @@ const SendPage = () => {
   const token = balances.find(
     ({ denom, chain }) =>
       chain === watch("chain") &&
-      readNativeDenom(denom).token === watch("asset")
+      readNativeDenom(denom).token === watch("asset"),
   )
 
-  /* resolve asset */
   useEffect(() => {
-    if (!asset) {
+    if (!asset && defaultAsset) {
       setValue("asset", defaultAsset)
     }
-  }, [form, asset, defaultAsset, setValue])
+  }, [asset, defaultAsset, setValue])
 
-  /* resolve recipient */
   useEffect(() => {
     if (!recipient) {
       setValue("address", undefined)
@@ -167,14 +164,12 @@ const SendPage = () => {
     }
   }, [form, recipient, setValue])
 
-  /* resolve source chain */
   useEffect(() => {
     if (availableChains?.length) {
       setValue("chain", availableChains[0])
     }
-  }, [asset]) // eslint-disable-line
+  }, [availableChains, setValue])
 
-  /* render detected destination chain */
   function renderDestinationChain() {
     if (
       !chain ||
@@ -219,7 +214,6 @@ const SendPage = () => {
     }
   }
 
-  /* tx */
   const createTx = useCallback(
     ({ address, input, memo }: TxValues) => {
       if (!addresses) return
@@ -237,14 +231,14 @@ const SendPage = () => {
               new MsgExecuteContract(
                 addresses[token?.chain ?? ""],
                 token?.denom ?? "",
-                execute_msg
+                execute_msg,
               ),
             ]
           : [
               new MsgSend(
                 addresses[token?.chain ?? ""],
                 address,
-                amount + token?.denom
+                amount + token?.denom,
               ),
             ]
 
@@ -276,10 +270,10 @@ const SendPage = () => {
                       JSON.stringify({
                         channel,
                         remote_address: address,
-                      })
+                      }),
                     ).toString("base64"),
                   },
-                }
+                },
               ),
             ]
           : [
@@ -291,7 +285,7 @@ const SendPage = () => {
                 address,
                 undefined,
                 (Date.now() + 120 * 1000) * 1e6,
-                undefined
+                undefined,
               ),
             ]
 
@@ -308,7 +302,7 @@ const SendPage = () => {
       ibcDenoms,
       networkName,
       token,
-    ]
+    ],
   )
 
   const onChangeMax = useCallback(
@@ -316,10 +310,9 @@ const SendPage = () => {
       setValue("input", input)
       await trigger("input")
     },
-    [setValue, trigger]
+    [setValue, trigger],
   )
 
-  /* fee */
   const coins = [{ input, denom: "" }] as CoinInput[]
   const estimationTxValues = useMemo(() => {
     return {
@@ -361,146 +354,162 @@ const SendPage = () => {
       acc[item.denom] = item
       return acc
     },
-    {}
+    {},
   )
 
   return (
     // @ts-expect-error
     <Tx {...tx}>
-      {({ max, fee, submit }) => (
-        <Form onSubmit={handleSubmit(submit.fn)} className={styles.form}>
-          <section className={styles.send}>
-            <div className={styles.form__container}>
-              <div className={styles.form__header__wrapper}>
-                <h1>{t("Send")}</h1>
-              </div>
-              <FormItem
-                label={t("Asset")}
-                error={errors.asset?.message ?? errors.address?.message}
-              >
-                <AssetSelector
-                  value={asset ?? defaultAsset}
-                  onChange={(asset) => setValue("asset", asset)}
-                  assetList={filteredAssets}
-                  assetsByDenom={assetsByDenom}
-                />
-              </FormItem>
-              {availableChains && (
-                <FormItem label={t("Source chain")}>
-                  <ChainSelector
-                    value={chain ?? ""}
-                    chainsList={availableChains}
-                    onChange={(chain) => setValue("chain", chain)}
+      {({ max, fee, submit }) => {
+        const onSubmit = handleSubmit(async (values: TxValues) => {
+          if (!values.address || values.input == null) return
+          await submit.fn({
+            ...values,
+            address: values.address,
+            input: values.input,
+          })
+        })
+
+        return (
+          <Form onSubmit={onSubmit} className={styles.form}>
+            <section className={styles.send}>
+              <div className={styles.form__container}>
+                <div className={styles.form__header__wrapper}>
+                  <h1>{t("Send")}</h1>
+                </div>
+
+                <FormItem
+                  label={t("Asset")}
+                  error={errors.asset?.message ?? errors.address?.message}
+                >
+                  <AssetSelector
+                    value={asset ?? defaultAsset}
+                    onChange={(asset) => setValue("asset", asset)}
+                    assetList={filteredAssets}
+                    assetsByDenom={assetsByDenom}
                   />
                 </FormItem>
-              )}
-              <FormItem
-                label={t("Recipient")}
-                extra={renderDestinationChain()}
-                error={errors.recipient?.message ?? errors.address?.message}
-              >
-                <ModalButton
-                  title={t("Address book")}
-                  renderButton={(open) => (
-                    <Input
-                      {...register("recipient", {
-                        validate: {
-                          ...validate.recipient(),
-                          ...validate.ibc(
-                            networks,
-                            chain ?? "",
-                            token?.denom ?? "",
-                            getIBCChannel,
-                            readNativeDenom(token?.denom ?? "").isAxelar
-                          ),
-                        },
-                      })}
-                      placeholder={SAMPLE_ADDRESS}
-                      actionButton={{
-                        icon: <ContactsIcon />,
-                        onClick: open,
-                      }}
-                      autoFocus
-                    />
-                  )}
-                >
-                  <AddressBookList
-                    onClick={async ({ recipient, memo }) => {
-                      setValue("recipient", recipient)
-                      memo && setValue("memo", memo)
-                      await trigger("recipient")
-                    }}
-                  />
-                </ModalButton>
 
-                <input {...register("address")} readOnly hidden />
-              </FormItem>
-
-              <FormItem
-                label={t("Amount")}
-                extra={max.render()}
-                error={errors.input?.message}
-              >
-                <Input
-                  {...register("input", {
-                    valueAsNumber: true,
-                    validate: validate.input(
-                      toInput(max.amount, decimals),
-                      decimals
-                    ),
-                  })}
-                  token={asset}
-                  type="number"
-                  inputMode="decimal"
-                  onFocus={max.reset}
-                  placeholder={getPlaceholder(decimals)}
-                />
-              </FormItem>
-
-              {!destinationAddress ||
-              getChainIDFromAddress(destinationAddress, networks) === chain ? (
-                <>
-                  <FormItem
-                    label={`${t("Memo")} (${t("optional")})`}
-                    error={errors.memo?.message}
-                  >
-                    <Input
-                      {...register("memo", {
-                        validate: {
-                          size: validate.size(256, "Memo"),
-                          brackets: validate.memo(),
-                          mnemonic: validate.isNotMnemonic(),
-                        },
-                      })}
+                {availableChains && (
+                  <FormItem label={t("Source chain")}>
+                    <ChainSelector
+                      value={chain ?? ""}
+                      chainsList={availableChains}
+                      onChange={(chain) => setValue("chain", chain)}
                     />
                   </FormItem>
+                )}
 
+                <FormItem
+                  label={t("Recipient")}
+                  extra={renderDestinationChain()}
+                  error={errors.recipient?.message ?? errors.address?.message}
+                >
+                  <ModalButton
+                    title={t("Address book")}
+                    renderButton={(open) => (
+                      <Input
+                        {...register("recipient", {
+                          validate: {
+                            ...validate.recipient(),
+                            ...validate.ibc(
+                              networks,
+                              chain ?? "",
+                              token?.denom ?? "",
+                              getIBCChannel,
+                              readNativeDenom(token?.denom ?? "").isAxelar,
+                            ),
+                          },
+                        })}
+                        placeholder={SAMPLE_ADDRESS}
+                        actionButton={{
+                          icon: <ContactsIcon />,
+                          onClick: open,
+                        }}
+                        autoFocus
+                      />
+                    )}
+                  >
+                    <AddressBookList
+                      onClick={async ({ recipient, memo }) => {
+                        setValue("recipient", recipient)
+                        if (memo) setValue("memo", memo)
+                        await trigger("recipient")
+                      }}
+                    />
+                  </ModalButton>
+
+                  <input {...register("address")} readOnly hidden />
+                </FormItem>
+
+                <FormItem
+                  label={t("Amount")}
+                  extra={max.render()}
+                  error={errors.input?.message}
+                >
+                  <Input
+                    {...register("input", {
+                      valueAsNumber: true,
+                      validate: validate.input(
+                        toInput(max.amount, decimals),
+                        decimals,
+                      ),
+                    })}
+                    token={asset}
+                    type="number"
+                    inputMode="decimal"
+                    onFocus={max.reset}
+                    placeholder={getPlaceholder(decimals)}
+                  />
+                </FormItem>
+
+                {!destinationAddress ||
+                getChainIDFromAddress(destinationAddress, networks) ===
+                  chain ? (
+                  <>
+                    <FormItem
+                      label={`${t("Memo")} (${t("optional")})`}
+                      error={errors.memo?.message}
+                    >
+                      <Input
+                        {...register("memo", {
+                          validate: {
+                            size: validate.size(256, "Memo"),
+                            brackets: validate.memo(),
+                            mnemonic: validate.isNotMnemonic(),
+                          },
+                        })}
+                      />
+                    </FormItem>
+
+                    <Grid gap={4}>
+                      {!memo && (
+                        <FormWarning>
+                          {t("Check if this transaction requires a memo")}
+                        </FormWarning>
+                      )}
+                    </Grid>
+                  </>
+                ) : (
                   <Grid gap={4}>
                     {!memo && (
                       <FormWarning>
-                        {t("Check if this transaction requires a memo")}
+                        {t(
+                          "This is a cross-chain transaction. Don't send tokens to exchanges with this tx.",
+                        )}
                       </FormWarning>
                     )}
                   </Grid>
-                </>
-              ) : (
-                <Grid gap={4}>
-                  {!memo && (
-                    <FormWarning>
-                      {t(
-                        "This is a cross-chain transaction. Don't send tokens to exchanges with this tx."
-                      )}
-                    </FormWarning>
-                  )}
-                </Grid>
-              )}
+                )}
 
-              {fee.render()}
-            </div>
-          </section>
-          <section className={styles.actions}>{submit.button}</section>
-        </Form>
-      )}
+                {fee.render()}
+              </div>
+            </section>
+
+            <section className={styles.actions}>{submit.button}</section>
+          </Form>
+        )
+      }}
     </Tx>
   )
 }

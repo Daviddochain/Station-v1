@@ -33,13 +33,13 @@ const LCDSetting = () => {
   const form = useForm<FormValues>({ mode: "onChange" })
   const {
     register,
-    //trigger,
     watch,
     setValue,
     handleSubmit,
     formState: { errors },
   } = form
   const { network, chainID, lcd } = watch()
+
   const networksList = useMemo(
     () =>
       Object.values(networks[network] ?? {})
@@ -49,7 +49,7 @@ const LCDSetting = () => {
           return 0
         })
         .map(({ chainID }) => chainID),
-    [networks, network]
+    [networks, network],
   )
 
   useEffect(() => {
@@ -75,11 +75,10 @@ const LCDSetting = () => {
     setValue("lcd", customLCDs[chainID] ?? "")
   }, [setValue, customLCDs, chainID])
 
-  const { data: errorMessage, isLoading } = useValidateLCD(
-    lcd,
-    chainID,
-    customLCDs[chainID] !== lcd
-  )
+  const { data: lcdValidation, isLoading } = useValidateLCD(lcd)
+
+  const errorMessage =
+    lcd && lcdValidation && !lcdValidation.valid ? "Invalid LCD URL" : undefined
 
   const isDisabled = !!errorMessage || isLoading
   const isSaved = (!customLCDs[chainID] && !lcd) || customLCDs[chainID] === lcd
@@ -120,7 +119,6 @@ const LCDSetting = () => {
 
   function submit({ chainID, lcd }: FormValues) {
     if (isDisabled) return
-
     changeCustomLCDs(chainID, lcd)
   }
 
@@ -171,7 +169,9 @@ const LCDSetting = () => {
           })}
         />
       </FormItem>
+
       <div className={styles.button__padding}></div>
+
       <section className={styles.button__conainer}>
         <Button color="primary" disabled={isDisabled || isSaved} type="submit">
           {isLoading ? (

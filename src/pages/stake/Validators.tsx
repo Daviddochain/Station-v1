@@ -37,31 +37,35 @@ const Validators = () => {
   const alliancesData = useAllAlliances()
   const alliances = alliancesData.reduce(
     (acc, { data }) => (data ? [...acc, ...data] : acc),
-    [] as AllianceDetails[]
+    [] as AllianceDetails[],
   )
+
   const stakingParamsData = useAllStakingParams()
   const unbondingtime = stakingParamsData.reduce(
     (acc, { data }) =>
-      data ? { ...acc, [data?.chainID]: data.unbonding_time ?? 0 } : acc,
-    {} as Record<string, number>
+      data && "unbonding_time" in data
+        ? { ...acc, [data.chainID]: data.unbonding_time ?? 0 }
+        : acc,
+    {} as Record<string, number>,
   )
 
   const delegationsData = useInterchainDelegations()
   const delegations: Delegation[] = delegationsData.reduce(
-    (acc, { data }) => (data ? [...data?.delegation, ...acc] : acc),
-    [] as Delegation[]
+    (acc, { data }) => (data ? [...data.delegation, ...acc] : acc),
+    [] as Delegation[],
   )
+
   const allianceDelegationsData = useInterchainAllianceDelegations()
   const allianceDelegations = allianceDelegationsData.reduce(
     (acc, { data }) => (data ? [data, ...acc] : acc),
-    [] as { delegations: AllianceDelegation[]; chainID: string }[]
+    [] as { delegations: AllianceDelegation[]; chainID: string }[],
   )
 
   const state = combineState(
     ...alliancesData,
     ...stakingParamsData,
     ...delegationsData,
-    ...allianceDelegationsData
+    ...allianceDelegationsData,
   )
 
   const options = [
@@ -76,7 +80,7 @@ const Validators = () => {
           balance?.denom === baseAsset && Number(balance?.amount) > 0
             ? [...acc, validator_address]
             : acc,
-        [] as string[]
+        [] as string[],
       ),
     })),
     ...(alliances ?? []).map(({ denom, reward_weight, chainID }) => ({
@@ -90,7 +94,7 @@ const Validators = () => {
           delChainID === chainID &&
           delegations.some(
             ({ balance }) =>
-              balance?.denom === denom && Number(balance?.amount) > 0
+              balance?.denom === denom && Number(balance?.amount) > 0,
           )
             ? [
                 ...acc,
@@ -99,28 +103,32 @@ const Validators = () => {
                     ...acc,
                     validator_address,
                   ],
-                  [] as string[]
+                  [] as string[],
                 ),
               ]
             : acc,
-        [] as string[]
+        [] as string[],
       ),
     })),
   ]
 
-  const tokenList = options.reduce((acc, { denom }) => {
-    const token = readNativeDenom(denom)
-    if (token.type === TokenType.IBC) return acc
-    return token.lsd
-      ? {
-          [token.lsd]: readNativeDenom(token.lsd),
-          ...acc,
-        }
-      : {
-          [token.token]: token,
-          ...acc,
-        }
-  }, {} as Record<string, TokenInterface>)
+  const tokenList = options.reduce(
+    (acc, { denom }) => {
+      const token = readNativeDenom(denom)
+      if (token.type === TokenType.IBC) return acc
+
+      return token.lsd
+        ? {
+            [token.lsd]: readNativeDenom(token.lsd),
+            ...acc,
+          }
+        : {
+            [token.token]: token,
+            ...acc,
+          }
+    },
+    {} as Record<string, TokenInterface>,
+  )
 
   return (
     <Page sub {...state}>
@@ -132,6 +140,7 @@ const Validators = () => {
           onChange={setToken}
         />
       </header>
+
       <WithSearchInput
         gap={0}
         placeholder={t("Search for validator...")}
@@ -144,7 +153,7 @@ const Validators = () => {
                 ({ denom }) =>
                   !token ||
                   readNativeDenom(denom).token === token ||
-                  readNativeDenom(denom).lsd === token
+                  readNativeDenom(denom).lsd === token,
               )}
               extra={({ chainID, denom, delegatedTo }) => (
                 <ValidatorsList
@@ -193,7 +202,7 @@ const Validators = () => {
                                       <h1>Alliance</h1>
                                       <p>
                                         {t(
-                                          "Assets of one chain can be staked on another, creating a mutually-beneficial economic partnership through interchain staking"
+                                          "Assets of one chain can be staked on another, creating a mutually-beneficial economic partnership through interchain staking",
                                         )}
                                       </p>
                                     </article>

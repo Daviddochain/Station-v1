@@ -3,7 +3,7 @@ import { useNativeDenoms } from "data/token"
 import { useExchangeRates } from "data/queries/coingecko"
 import { combineState } from "data/query"
 import { useDelegations } from "data/queries/staking"
-import { AccAddress, Coin } from "@terra-money/feather.js"
+import { AccAddress, Coin, Delegation } from "@terra-money/feather.js"
 import { ValidatorLink } from "components/general"
 import { ModalButton } from "components/feedback"
 import { Table } from "components/layout"
@@ -30,13 +30,13 @@ const ChainDelegations = ({ chain }: { chain: string }) => {
   const state = combineState(
     pricesState,
     chainDelegationsState,
-    hubDelegationsState
+    hubDelegationsState,
   )
 
   const currentNetwork = networks[chain]
   const chainDelegations = nativeDelegations?.reduce(
-    (acc, item) => (item ? [...acc, item] : acc),
-    parseResToDelegation(hubDelegations, chain)
+    (acc: Delegation[], item: Delegation) => (item ? [...acc, item] : acc),
+    parseResToDelegation(hubDelegations, chain) as Delegation[],
   )
 
   const title = t("Delegations")
@@ -44,11 +44,16 @@ const ChainDelegations = ({ chain }: { chain: string }) => {
   if (!chainDelegations || !prices) return null
 
   const chainDenom = currentNetwork?.baseAsset
-  const chainTotalPriceAndAmount: any = chainDelegations?.reduce(
-    ({ price, amount }, { balance }, index) => {
+  const chainTotalPriceAndAmount = chainDelegations.reduce(
+    (
+      { price, amount }: { price: number; amount: number },
+      { balance }: Delegation,
+      index: number,
+    ) => {
       const { token, decimals } = readNativeDenom(balance.denom)
       let newPriceHolder = price
       let newAmountHolder = amount
+
       if (index === 0) {
         newPriceHolder = 0
         newAmountHolder = 0
@@ -68,7 +73,7 @@ const ChainDelegations = ({ chain }: { chain: string }) => {
 
       return { price, amount }
     },
-    { price: 0, amount: 0 }
+    { price: 0, amount: 0 },
   )
 
   return (
@@ -80,30 +85,30 @@ const ChainDelegations = ({ chain }: { chain: string }) => {
           title={
             <div className={styles.header_wrapper}>
               {title}
-              {chainDelegations?.length > 0 && (
+              {chainDelegations.length > 0 && (
                 <span className={styles.view_more}>View More</span>
               )}
             </div>
           }
-          value={chainTotalPriceAndAmount?.price?.toString()}
-          amount={chainTotalPriceAndAmount?.amount?.toString()}
+          value={chainTotalPriceAndAmount.price.toString()}
+          amount={chainTotalPriceAndAmount.amount.toString()}
           denom={chainDenom}
           onClick={open}
           cardName={"delegations"}
-          forceClickAction={chainDelegations?.length > 0}
+          forceClickAction={chainDelegations.length > 0}
         />
       )}
     >
       <Table
         dataSource={chainDelegations}
-        sorter={({ balance: { amount: a } }, { balance: { amount: b } }) =>
-          b.minus(a).toNumber()
+        sorter={(left: Delegation, right: Delegation) =>
+          right.balance.amount.minus(left.balance.amount).toNumber()
         }
         columns={[
           {
             title: t("Validator"),
             dataIndex: "validator_address",
-            render: (address: AccAddress, r) => {
+            render: (address: AccAddress, r: Delegation) => {
               if (address === allianceHub.useHubAddress()) {
                 return <AllianceHubStakeCTA denom={r.balance.denom} />
               } else {

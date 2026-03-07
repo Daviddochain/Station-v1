@@ -4,7 +4,7 @@ import { Link } from "react-router-dom"
 import classNames from "classnames/bind"
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined"
 import { readPercent } from "@terra-money/terra-utils"
-import { ValAddress, Vote } from "@terra-money/feather.js"
+import { Delegation, ValAddress, Vote } from "@terra-money/feather.js"
 import { combineState } from "data/query"
 import { useDelegations, useValidators } from "data/queries/staking"
 import { useGetVoteOptionItem } from "data/queries/gov"
@@ -30,10 +30,10 @@ const ProposalVotesByValidator = ({ id }: { id: string }) => {
     [Vote.Option.VOTE_OPTION_YES]: t("Agree"),
     [Vote.Option.VOTE_OPTION_NO]: t("Disagree"),
     [Vote.Option.VOTE_OPTION_NO_WITH_VETO]: t(
-      "Strongly disagree and should not return the deposit to the proposer"
+      "Strongly disagree and should not return the deposit to the proposer",
     ),
     [Vote.Option.VOTE_OPTION_ABSTAIN]: t(
-      "No decision but this vote counts toward vote quorum"
+      "No decision but this vote counts toward vote quorum",
     ),
     [Vote.Option.VOTE_OPTION_UNSPECIFIED]: "",
     [Vote.Option.UNRECOGNIZED]: "",
@@ -52,7 +52,7 @@ const ProposalVotesByValidator = ({ id }: { id: string }) => {
   const state = combineState(
     delegationsState,
     TerraProposalState,
-    TerraValidatorsState
+    TerraValidatorsState,
   )
 
   const getList = useCallback(
@@ -61,7 +61,7 @@ const ProposalVotesByValidator = ({ id }: { id: string }) => {
 
       const getIsDelegated = (address: ValAddress) => {
         return delegations.some(
-          ({ validator_address }) => validator_address === address
+          ({ validator_address }: Delegation) => validator_address === address,
         )
       }
 
@@ -71,7 +71,7 @@ const ProposalVotesByValidator = ({ id }: { id: string }) => {
             return false
 
           const voted = options.some(
-            (o) => (Vote.Option[o.option] as unknown as Vote.Option) === option
+            (o) => (Vote.Option[o.option] as unknown as Vote.Option) === option,
           )
 
           return !option || voted
@@ -85,12 +85,12 @@ const ProposalVotesByValidator = ({ id }: { id: string }) => {
         return getHasVoted(operator_address, tab)
       })
     },
-    [TerraProposal, TerraValidators, delegatedOnly, delegations]
+    [TerraProposal, TerraValidators, delegatedOnly, delegations],
   )
 
   const getCount = useCallback(
     (tab?: Vote.Option) => getList(tab).length,
-    [getList]
+    [getList],
   )
 
   const render = () => {

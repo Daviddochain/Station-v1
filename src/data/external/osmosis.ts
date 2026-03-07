@@ -2,81 +2,96 @@ import { useQuery } from "react-query"
 import request from "axios"
 import { queryKey } from "../query"
 
-// https://api-osmosis.imperator.co/swagger/
-export const OSMOSIS_API_URL = "https://api-osmosis.imperator.co"
+// Official public Osmosis LCD from Osmosis docs
+export const OSMOSIS_LCD_URL = "https://lcd.osmosis.zone"
 
 export const GAMM_TOKEN_DECIMALS = 18
 export const OSMO_ICON =
   "https://station-assets.terra.dev/img/chains/Osmosis.svg"
 
 interface IOsmosisPoolAsset {
-  symbol: string
-  amount: number
-  denom: string
-  coingecko_id: string
-  liquidity: number
-  liquidity_24h_change: number
-  volume_24h: number
-  volume_24h_change: number
-  volume_7d: number
-  price: number
-  fees: string
+  token?: {
+    denom?: string
+    amount?: string
+  }
+  weight?: string
 }
 
-interface IOsmosisPoolResponse {
-  // pool_id: pool asset array
-  [key: string]: IOsmosisPoolAsset[]
+interface IOsmosisPool {
+  "@type"?: string
+  id?: string
+  pool_assets?: IOsmosisPoolAsset[]
+}
+
+interface IOsmosisPoolsResponse {
+  pools?: IOsmosisPool[]
+  pagination?: {
+    next_key?: string | null
+    total?: string
+  }
 }
 
 /**
  * Map token name to gamm denoms
  * e.g. gamm/pool/1 -> ATOM-OSMO LP
  *
- * @returns a map of token name strings indexed by gamm denom
+ * Uses official Osmosis LCD instead of dead Imperator-style APIs.
  */
 export const useGammTokens = () => {
-  const fetch = useQuery<IOsmosisPoolResponse>(
+  const fetch = useQuery<IOsmosisPoolsResponse>(
     [queryKey.gammTokens],
     async () => {
       try {
-        const response = await request.get<IOsmosisPoolResponse>(
-          "/pools/v2/all?low_liquidity=true",
-          { baseURL: OSMOSIS_API_URL },
+        const response = await request.get<IOsmosisPoolsResponse>(
+          `${OSMOSIS_LCD_URL}/osmosis/gamm/v1beta1/pools`,
+          {
+            params: { "pagination.limit": 1000 },
+            timeout: 10000,
+          },
         )
 
         const data = response?.data
 
-        if (!data || typeof data !== "object") {
-          console.error("Invalid Osmosis API response format")
-          return {}
+        if (!data || typeof data !== "object" || !Array.isArray(data.pools)) {
+          console.warn("Invalid Osmosis LCD response format")
+          return { pools: [] }
         }
 
         return data
       } catch (error) {
-        console.error("Failed to fetch Osmosis pool data:", error)
-        return {}
+        console.warn("Failed to fetch Osmosis pool data:", error)
+        return { pools: [] }
       }
     },
     {
-      // Data will never become stale and always stay in cache
       cacheTime: Infinity,
       staleTime: Infinity,
+      retry: false,
+      refetchOnWindowFocus: false,
     },
   )
 
   const gammTokens = new Map<string, string>()
 
-  if (fetch.data && typeof fetch.data === "object") {
-    for (const [poolId, poolAsset] of Object.entries(fetch.data)) {
-      if (Array.isArray(poolAsset)) {
-        gammTokens.set(
-          "gamm/pool/" + poolId,
-          poolAsset.map((asset) => asset.symbol).join("-") + " LP",
-        )
-      } else {
-        console.error("Invalid pool asset format for pool:", poolId)
-      }
-    }
+  const pools = fetch.data?.pools ?? []
+
+  for (const pool of pools) {
+    const poolId = pool?.id
+    const assets = pool?.pool_assets ?? []
+
+    if (!poolId || !Array.isArray(assets) || assets.length === 0) continue
+
+    const symbols = assets
+      .map((asset) => asset?.token?.denom)
+      .filter((denom): denom is string => !!denom)
+      .map((denom) => {
+        if (denom === "uosmo") return "OSMO"
+        return denom.replace(/^u/, "").toUpperCase()
+      })
+
+    if (!symbols.length) continue
+
+    gammTokens.set(`gamm/pool/${poolId}`, `${symbols.join("-")} LP`)
   }
 
   return gammTokens

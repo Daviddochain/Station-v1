@@ -13,7 +13,7 @@ export const useActiveDenoms = () => {
     async () => {
       return ["uluna"]
     },
-    { ...RefetchOptions.INFINITY }
+    { ...RefetchOptions.INFINITY },
   )
 }
 
@@ -26,7 +26,7 @@ export const useSupportedFiat = () => {
       })
       return data as { name: string; symbol: string; id: string }[]
     },
-    { ...RefetchOptions.INFINITY }
+    { ...RefetchOptions.INFINITY },
   )
 }
 
@@ -51,6 +51,80 @@ const STAKED_TOKENS: Record<string, string> = {
   terra14y9aa87v4mjvpf0vu8xm7nvldvjvk4h3wly2240u0586j4l6qm2q7ngp7t: "sHAR",
 }
 
+type PriceObject = Record<
+  string,
+  {
+    price: number
+    change: number
+  }
+>
+
+const queryTFMStationIDs = async () => {
+  try {
+    const { data } = await axios.get<Record<string, string>>(
+      "station/tfm.json",
+      {
+        baseURL: ASSETS,
+        timeout: 10000,
+      },
+    )
+
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      console.warn("Invalid station/tfm.json response format")
+      return {}
+    }
+
+    return data
+  } catch (error) {
+    console.warn("Failed to load station TFM ids", error)
+    return {}
+  }
+}
+
+const queryTFMPrices = async () => {
+  try {
+    const response = await axios.get<Record<string, TFMPrice>>(
+      "https://price.api.tfm.com/tokens/",
+      {
+        params: { limit: 1500 },
+        timeout: 10000,
+      },
+    )
+
+    const payload = response?.data
+
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      console.warn("Invalid TFM price response format")
+      return {}
+    }
+
+    return payload
+  } catch (error) {
+    console.warn("Failed to load TFM prices", error)
+    return {}
+  }
+}
+
+const queryFiatPrice = async (currencyId: string) => {
+  if (currencyId === "USD") return 1
+
+  try {
+    const { data } = await axios.get<{
+      quotes?: Record<string, number>
+    }>(
+      `https://apilayer.net/api/live?source=USD&currencies=${currencyId}&access_key=${CURRENCY_KEY}`,
+      {
+        timeout: 10000,
+      },
+    )
+
+    return data?.quotes?.[`USD${currencyId}`] ?? 1
+  } catch (error) {
+    console.warn(`Failed to load fiat conversion for ${currencyId}`, error)
+    return 1
+  }
+}
+
 export const useExchangeRates = () => {
   const currency = useCurrency()
   const isClassic = useNetworkName() === "classic"
@@ -58,36 +132,24 @@ export const useExchangeRates = () => {
   return useQuery(
     [queryKey.coingecko.exchangeRates, currency, isClassic],
     async () => {
-      const [{ data: TFM_IDs }, { data: prices }, fiatPrice] =
-        await Promise.all([
-          axios.get<Record<string, string>>("station/tfm.json", {
-            baseURL: ASSETS,
-          }),
-          axios.get<Record<string, TFMPrice>>(
-            `https://price.api.tfm.com/tokens/?limit=1500`
-          ),
-          (async () => {
-            if (currency.id === "USD") return 1
+      const [TFM_IDs, prices, fiatPrice] = await Promise.all([
+        queryTFMStationIDs(),
+        queryTFMPrices(),
+        queryFiatPrice(currency.id),
+      ])
 
-            const { data } = await axios.get<{
-              quotes: Record<string, number>
-            }>(
-              `https://apilayer.net/api/live?source=USD&currencies=${currency.id}&access_key=${CURRENCY_KEY}`
-            )
+      const priceObject: PriceObject = Object.fromEntries(
+        Object.entries(prices ?? {}).map(([denom, value]) => {
+          const usd = value?.usd ?? 0
+          const change24h = value?.change24h ?? 0
 
-            return data?.quotes?.[`USD${currency.id}`] ?? 1
-          })(),
-        ])
-
-      const priceObject = Object.fromEntries(
-        Object.entries(prices ?? {}).map(([denom, { usd, change24h }]) => {
           // if token is LUNA and network is classic, use LUNC price
           if (denom === "uluna" && isClassic) {
             return [
               denom,
               {
-                price: prices?.uluna_classic?.usd * fiatPrice,
-                change: prices?.uluna_classic?.change24h,
+                price: (prices?.uluna_classic?.usd ?? 0) * fiatPrice,
+                change: prices?.uluna_classic?.change24h ?? 0,
               },
             ]
           }
@@ -99,7 +161,7 @@ export const useExchangeRates = () => {
               change: change24h,
             },
           ]
-        }) ?? {}
+        }),
       )
 
       Object.entries(TFM_IDs ?? {}).forEach(([key, value]) => {
@@ -122,7 +184,11 @@ export const useExchangeRates = () => {
 
       return priceObject
     },
-    { ...RefetchOptions.DEFAULT }
+    {
+      ...RefetchOptions.DEFAULT,
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
   )
 }
 
@@ -137,6 +203,6 @@ export const useMemoizedCalcValue = () => {
       if (!memoizedPrices) return
       return Number(amount) * Number(memoizedPrices[denom]?.price ?? 0)
     },
-    [memoizedPrices]
+    [memoizedPrices],
   )
 }

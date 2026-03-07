@@ -48,9 +48,28 @@ const getStakingClient = (lcd: any, chainID?: string) => {
   }
 }
 
+const BROKEN_LCD_HOSTS = new Set(["lcd-terraclassic.tfl.foundation"])
+
+const parseURL = (value?: string) => {
+  if (!value) return null
+
+  try {
+    return new URL(value)
+  } catch {
+    return null
+  }
+}
+
+const shouldSkipLCD = (lcd?: string) => {
+  const parsed = parseURL(lcd)
+  if (!parsed) return false
+  return BROKEN_LCD_HOSTS.has(parsed.hostname)
+}
+
 export const useInterchainValidators = () => {
   const addresses = useInterchainAddressesWithFeature(ChainFeature.STAKING)
   const lcd = useInterchainLCDClient()
+  const networks = useNetwork()
 
   return useQueries(
     Object.keys(addresses ?? {}).map((chainID) => {
@@ -58,7 +77,9 @@ export const useInterchainValidators = () => {
         queryKey: [queryKey.interchain.staking.validators, addresses, chainID],
         queryFn: async () => {
           const staking = getStakingClient(lcd, chainID)
-          if (!staking) return []
+          const chainLCD = networks?.[chainID]?.lcd
+
+          if (!staking || shouldSkipLCD(chainLCD)) return []
 
           const result: Validator[] = []
           let key: string | null = ""
@@ -94,12 +115,14 @@ export const useInterchainValidators = () => {
 
 export const useValidators = (chainID?: string) => {
   const lcd = useInterchainLCDClient()
+  const networks = useNetwork()
+  const chainLCD = chainID ? networks?.[chainID]?.lcd : undefined
 
   return useQuery(
     [queryKey.staking.validators, chainID],
     async () => {
       const staking = getStakingClient(lcd, chainID)
-      if (!staking || !chainID) return []
+      if (!staking || !chainID || shouldSkipLCD(chainLCD)) return []
 
       const result: Validator[] = []
       let key: string | null = ""
@@ -126,7 +149,10 @@ export const useValidators = (chainID?: string) => {
         return []
       }
     },
-    { ...RefetchOptions.INFINITY, enabled: !!chainID },
+    {
+      ...RefetchOptions.INFINITY,
+      enabled: !!chainID && !shouldSkipLCD(chainLCD),
+    },
   )
 }
 
@@ -178,11 +204,12 @@ export const useValidator = (operatorAddress: ValAddress) => {
   const lcd = useInterchainLCDClient()
   const networks = useNetwork()
   const chainID = getChainIDFromAddress(operatorAddress, networks)
+  const chainLCD = chainID ? networks?.[chainID]?.lcd : undefined
 
   return useQuery(
     [queryKey.staking.validator, operatorAddress],
     async () => {
-      if (!chainID || !lcd?.staking) return undefined
+      if (!chainID || !lcd?.staking || shouldSkipLCD(chainLCD)) return undefined
 
       try {
         return await lcd.staking.validator(operatorAddress)
@@ -191,7 +218,10 @@ export const useValidator = (operatorAddress: ValAddress) => {
         return undefined
       }
     },
-    { ...RefetchOptions.INFINITY, enabled: !!chainID },
+    {
+      ...RefetchOptions.INFINITY,
+      enabled: !!chainID && !shouldSkipLCD(chainLCD),
+    },
   )
 }
 
@@ -249,13 +279,21 @@ export const getChainUnbondTime = (unbondTime: number | undefined) => {
 export const useDelegations = (chainID: string, disabled?: boolean) => {
   const addresses = useInterchainAddressesWithFeature(ChainFeature.STAKING)
   const lcd = useInterchainLCDClient()
+  const networks = useNetwork()
+  const chainLCD = chainID ? networks?.[chainID]?.lcd : undefined
 
   return useQuery(
     [queryKey.staking.delegations, addresses?.[chainID], chainID],
     async () => {
       const staking = getStakingClient(lcd, chainID)
 
-      if (!staking || !addresses || !addresses[chainID]) return []
+      if (
+        !staking ||
+        !addresses ||
+        !addresses[chainID] ||
+        shouldSkipLCD(chainLCD)
+      )
+        return []
 
       try {
         const response = await staking.delegations(
@@ -274,7 +312,10 @@ export const useDelegations = (chainID: string, disabled?: boolean) => {
         return []
       }
     },
-    { ...RefetchOptions.DEFAULT, enabled: !!chainID && !disabled },
+    {
+      ...RefetchOptions.DEFAULT,
+      enabled: !!chainID && !disabled && !shouldSkipLCD(chainLCD),
+    },
   )
 }
 
@@ -336,13 +377,21 @@ export const useInterchainUnbondings = () => {
 export const useUnbondings = (chainID: string) => {
   const addresses = useInterchainAddressesWithFeature(ChainFeature.STAKING)
   const lcd = useInterchainLCDClient()
+  const networks = useNetwork()
+  const chainLCD = chainID ? networks?.[chainID]?.lcd : undefined
 
   return useQuery(
     [queryKey.staking.unbondings, addresses, chainID],
     async () => {
       const staking = getStakingClient(lcd, chainID)
 
-      if (!staking || !addresses || !addresses[chainID]) return []
+      if (
+        !staking ||
+        !addresses ||
+        !addresses[chainID] ||
+        shouldSkipLCD(chainLCD)
+      )
+        return []
 
       try {
         const response = await staking.unbondingDelegations(addresses[chainID])
@@ -352,17 +401,22 @@ export const useUnbondings = (chainID: string) => {
         return []
       }
     },
-    { ...RefetchOptions.DEFAULT, enabled: !!chainID },
+    {
+      ...RefetchOptions.DEFAULT,
+      enabled: !!chainID && !shouldSkipLCD(chainLCD),
+    },
   )
 }
 
 export const useStakingPool = (chainID: string) => {
   const lcd = useInterchainLCDClient()
+  const networks = useNetwork()
+  const chainLCD = chainID ? networks?.[chainID]?.lcd : undefined
 
   return useQuery(
     [queryKey.staking.pool, chainID],
     async () => {
-      if (!chainID || !lcd?.staking) return undefined
+      if (!chainID || !lcd?.staking || shouldSkipLCD(chainLCD)) return undefined
 
       try {
         return await lcd.staking.pool(chainID)
@@ -373,7 +427,7 @@ export const useStakingPool = (chainID: string) => {
     },
     {
       ...RefetchOptions.INFINITY,
-      enabled: !!chainID,
+      enabled: !!chainID && !shouldSkipLCD(chainLCD),
     },
   )
 }

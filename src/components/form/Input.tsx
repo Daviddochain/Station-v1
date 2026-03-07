@@ -19,7 +19,7 @@ interface Props extends InputHTMLAttributes<HTMLInputElement> {
 const Input = forwardRef(
   (
     { selectBefore, token, actionButton, ...attrs }: Props,
-    ref: ForwardedRef<HTMLInputElement>
+    ref: ForwardedRef<HTMLInputElement>,
   ) => {
     return (
       <div className={styles.wrapper}>
@@ -60,7 +60,7 @@ const Input = forwardRef(
         )}
       </div>
     )
-  }
+  },
 )
 
 export default Input
@@ -68,35 +68,41 @@ export default Input
 /* search */
 export const SearchInput = forwardRef(
   (
-    attrs: InputHTMLAttributes<HTMLInputElement> & {
+    {
+      padding,
+      small,
+      inline,
+      extra,
+      ...attrs
+    }: InputHTMLAttributes<HTMLInputElement> & {
       padding?: boolean
       small?: boolean
       inline?: boolean
       extra?: ReactNode
     },
-    ref: ForwardedRef<HTMLInputElement>
+    ref: ForwardedRef<HTMLInputElement>,
   ) => {
     return (
       <div
         className={cx(
           styles.wrapper,
           styles.search,
-          attrs.small && styles.search__small,
-          attrs.inline && styles.search__inline
+          small && styles.search__small,
+          inline && styles.search__inline,
         )}
-        style={attrs.padding ? {} : { margin: 0 }}
+        style={padding ? {} : { margin: 0 }}
       >
         <input
           {...attrs}
-          className={cx(styles.input, attrs.small && styles.input__small)}
+          className={cx(styles.input, small && styles.input__small)}
           inputMode="search"
           autoComplete="off"
           ref={ref}
         />
 
         <SearchIcon className={styles.icon} />
-        {attrs.extra}
+        {extra}
       </div>
     )
-  }
+  },
 )

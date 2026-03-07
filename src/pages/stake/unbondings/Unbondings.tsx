@@ -29,11 +29,10 @@ const Unbondings = () => {
   const interchainUnbondings = useInterchainUnbondings()
   const unbondings = interchainUnbondings.reduce(
     (acc, { data }) => (data ? [...data, ...acc] : acc),
-    [] as UnbondingDelegation[]
+    [] as UnbondingDelegation[],
   )
   const state = combineState(pricesState, ...interchainUnbondings)
 
-  /* render */
   const title = t("Undelegations")
 
   const render = () => {
@@ -43,11 +42,13 @@ const Unbondings = () => {
       let balance = 0
 
       unbonding.entries.forEach(
-        (entry) => (balance += entry.balance.toNumber())
+        (entry: UnbondingDelegation.Entry) =>
+          (balance += entry.balance.toNumber()),
       )
 
       const denom = getDenomFromAddress(networks, unbonding.delegator_address)
       const { token, decimals } = readNativeDenom(denom)
+
       return (
         acc + (balance * (prices[token]?.price || 0)) / Math.pow(10, decimals)
       )
@@ -65,7 +66,7 @@ const Unbondings = () => {
               <div className={styles.header_wrapper}>
                 <TooltipIcon
                   content={t(
-                    "A maximum 7 undelegations can be in progress at the same time"
+                    "A maximum 7 undelegations can be in progress at the same time",
                   )}
                   placement="bottom"
                 >
