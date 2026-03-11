@@ -5,7 +5,11 @@ import { useChainID, useNetwork } from "data/wallet"
 
 export const useInterchainLCDClient = () => {
   const network = useNetwork()
-  const lcdClient = useMemo(() => new InterchainLCDClient(network), [network])
+
+  const lcdClient = useMemo(() => {
+    return new InterchainLCDClient(network)
+  }, [network])
+
   return lcdClient
 }
 
@@ -13,10 +17,22 @@ export const useLCDClient = () => {
   const network = useNetwork()
   const chainID = useChainID()
 
-  const lcdClient = useMemo(
-    () => new LCDClient({ ...network[chainID], URL: network[chainID].lcd }),
-    [network, chainID]
-  )
+  const lcdClient = useMemo(() => {
+    const selected =
+      (chainID && network?.[chainID]) ||
+      Object.values(network ?? {}).find(
+        (item) => !!item && typeof item.lcd === "string" && !!item.lcd,
+      )
+
+    if (!selected || typeof selected.lcd !== "string") {
+      throw new Error("No valid LCD network configuration found")
+    }
+
+    return new LCDClient({
+      ...selected,
+      URL: selected.lcd,
+    })
+  }, [network, chainID])
 
   return lcdClient
 }

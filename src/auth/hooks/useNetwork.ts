@@ -56,17 +56,31 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
   const { customLCDs } = useCustomLCDs()
   const useOverrideAssets = process.env.REACT_APP_STATION_ASSETS
 
+  const walletWords = (wallet?.words ?? {}) as Record<
+    string,
+    string | undefined
+  >
+
   function withCustomLCDs(networks: Record<ChainID, InterchainNetwork>) {
     return Object.fromEntries(
       Object.entries(networks ?? {}).map(([key, val]) => [
         key,
         { ...val, lcd: customLCDs[val?.chainID] || val.lcd },
-      ]) ?? {},
+      ]),
+    )
+  }
+
+  function getSelectedNetworks() {
+    return withCustomLCDs(
+      (networks[network as NetworkName] as Record<
+        ChainID,
+        InterchainNetwork
+      >) ?? {},
     )
   }
 
   if (useOverrideAssets) {
-    return networks[network]
+    return getSelectedNetworks()
   }
 
   // check connected wallet
@@ -86,33 +100,29 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
     ) {
       setNetwork("localterra")
     }
-    return filterEnabledNetworks(
-      connectedWallet.network as Record<ChainID, InterchainNetwork>,
-    )
+
+    // Use our station-assets networks, not the wallet provider's embedded endpoints.
+    return filterEnabledNetworks(getSelectedNetworks())
   }
 
   // multisig wallet are supported only on terra
   if (is.multisig(wallet)) {
-    const terra = Object.values(
-      withCustomLCDs(
-        networks[network as NetworkName] as Record<ChainID, InterchainNetwork>,
-      ) ?? {},
-    ).find(({ prefix }) => prefix === "terra")
+    const terra = Object.values(getSelectedNetworks() ?? {}).find(
+      ({ prefix }) => prefix === "terra",
+    )
     if (!terra) return {}
-    return filterEnabledNetworks({ [terra?.chainID]: terra })
+    return filterEnabledNetworks({ [terra.chainID]: terra })
   }
 
   if (wallet) {
-    const enabledChains = Object.values(
-      withCustomLCDs(
-        networks[network as NetworkName] as Record<ChainID, InterchainNetwork>,
-      ) ?? {},
-    ).filter(({ coinType }) => !!wallet?.words?.[coinType])
+    const enabledChains = Object.values(getSelectedNetworks() ?? {}).filter(
+      ({ coinType }) => !!walletWords[String(coinType)],
+    )
 
     return filterEnabledNetworks(
       enabledChains.reduce(
         (acc, chain) => {
-          acc[chain?.chainID] = chain
+          acc[chain.chainID] = chain
           return acc
         },
         {} as Record<ChainID, InterchainNetwork>,
@@ -120,7 +130,7 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
     )
   }
 
-  return filterEnabledNetworks(withCustomLCDs(networks[network as NetworkName]))
+  return filterEnabledNetworks(getSelectedNetworks())
 }
 
 export const useNetworkName = () => {

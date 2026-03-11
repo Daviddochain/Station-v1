@@ -1,77 +1,104 @@
-import { useQuery } from "react-query"
 import axios from "axios"
+import { useQuery } from "react-query"
 import { RefetchOptions } from "data/query"
 
-const baseURL = "https://api-terra2.tfm.com"
-export const TFM_ROUTER =
-  "terra19hz374h6ruwtzrnm8ytkae782uv79h9yt9tuytgvt94t26c4793qnfg7vn"
+export const TFM_BASE_URL = "https://api-terra2.tfm.com"
+export const TFM_ROUTER = "tfm"
 
-interface TFMTokenItem {
-  contract_addr: string
-  decimals: number
-  id: number
-  name: string
-  symbol: string
-  is_token_liquid: boolean
+export interface TFMTokenItem {
+  denom?: string
+  symbol?: string
+  name?: string
+  decimals?: number
+  chainId?: string
+  image?: string
+  tokenUri?: string
+  price?: number
 }
 
-export const queryTFMTokens = async () => {
-  const { data } = await axios.get<TFMTokenItem[]>("/tokens", { baseURL })
-  return data.filter(({ is_token_liquid }) => is_token_liquid)
+export interface TFMRouteResult {
+  amountOut?: string
+  routes?: unknown[]
 }
 
-interface TFMRouteParams {
-  token0: string
-  token1: string
-  amount: string
-  exchange?: string
-  use_split: boolean
+export interface TFMSwapResult {
+  tx?: unknown
+  error?: string
 }
 
-interface TFMRouteResult {
-  alternatives: any
-  input_amount: number
-  price_impact: number
-  return_amount: number
-  routes: any[]
-}
+export const queryTFMTokens = async (): Promise<TFMTokenItem[]> => {
+  try {
+    const response = await axios.get("/tokens", {
+      baseURL: TFM_BASE_URL,
+      timeout: 10000,
+    })
 
-export const queryTFMRoute = async (params: TFMRouteParams) => {
-  const { data } = await axios.get<TFMRouteResult>("/route", {
-    baseURL,
-    params,
-  })
-  return data
-}
+    const data = response?.data
 
-interface TFMSwapParams extends TFMRouteParams {
-  slippage?: string
-}
+    if (!Array.isArray(data)) {
+      console.warn("Invalid TFM tokens response format", data)
+      return []
+    }
 
-interface TFMSwapResult {
-  type: string
-  value: {
-    coins: { amount: string; denom: string }[]
-    contract: string
-    execute_msg: object
-    sender: string
+    return data as TFMTokenItem[]
+  } catch (error) {
+    console.warn("Failed to load TFM tokens", error)
+    return []
   }
 }
 
-interface TFMSwapFailed {
-  message: string
-  success: false
-}
-
-export const queryTFMSwap = async (params: TFMSwapParams) => {
-  const { data } = await axios.get<TFMSwapResult | TFMSwapFailed>("/swap", {
-    baseURL,
-    params,
-  })
-
-  return data
-}
-
 export const useTFMTokens = () => {
-  return useQuery("TFM Tokens", queryTFMTokens, { ...RefetchOptions.INFINITY })
+  return useQuery(["tfm", "tokens"], queryTFMTokens, {
+    ...RefetchOptions.DEFAULT,
+    retry: false,
+    refetchOnWindowFocus: false,
+  })
+}
+
+export const queryTFMRoute = async (
+  params: Record<string, string | number | boolean | undefined>,
+): Promise<TFMRouteResult | null> => {
+  try {
+    const response = await axios.get("/route", {
+      baseURL: TFM_BASE_URL,
+      params,
+      timeout: 10000,
+    })
+
+    const data = response?.data
+
+    if (!data || typeof data !== "object") {
+      console.warn("Invalid TFM route response format", data)
+      return null
+    }
+
+    return data as TFMRouteResult
+  } catch (error) {
+    console.warn("Failed to load TFM route", error)
+    return null
+  }
+}
+
+export const queryTFMSwap = async (
+  params: Record<string, string | number | boolean | undefined>,
+): Promise<TFMSwapResult | null> => {
+  try {
+    const response = await axios.get("/swap", {
+      baseURL: TFM_BASE_URL,
+      params,
+      timeout: 10000,
+    })
+
+    const data = response?.data
+
+    if (!data || typeof data !== "object") {
+      console.warn("Invalid TFM swap response format", data)
+      return null
+    }
+
+    return data as TFMSwapResult
+  } catch (error) {
+    console.warn("Failed to load TFM swap", error)
+    return null
+  }
 }

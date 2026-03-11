@@ -23,7 +23,7 @@ interface PaginationKeys {
  * Returns pagination keys for the given chain. Switched by cosmos_sdk
  * version in the future, isTerra for now.
  *
- * @param isTerra boolean based on chain-id.  True if Terra, false if not.
+ * @param isTerra boolean based on chain-id. True if Terra, false if not.
  */
 function getPaginationKeys(isTerra: boolean): PaginationKeys {
   if (isTerra) {
@@ -46,24 +46,14 @@ const HistoryList = ({ chainID }: Props) => {
   const networks = useNetwork()
 
   const LIMIT = 75
-  const EVENTS = [
-    // any tx signed by the user
-    "message.sender",
-    // any coin received
-    "transfer.recipient",
-    // any coin sent
-    "transfer.sender",
-  ]
+  const EVENTS = ["message.sender", "transfer.recipient", "transfer.sender"]
 
   const historyData = useQueries(
     Object.keys(addresses ?? {})
       .filter((chain) => !chainID || chain === chainID)
       .map((chain) => {
         const address = chain && addresses?.[chain]
-
         const isTerra = isTerraChain(chain)
-
-        // return pagination keys by network.
         const paginationKeys = getPaginationKeys(isTerra)
 
         return {
@@ -72,27 +62,52 @@ const HistoryList = ({ chainID }: Props) => {
             const result: any[] = []
             const txhases: string[] = []
 
-            if (!networks?.[chain]?.lcd) {
+            if (!networks?.[chain]?.lcd || !address) {
+              return result
+            }
+
+            const lcd = networks[chain].lcd
+
+            // Temporary guard:
+            // Axelar LCD history calls are failing in the browser due to CORS.
+            // For now, return empty history for Axelar instead of spamming errors.
+            if (
+              chain === "axelar-dojo-1" ||
+              lcd.includes("lcd-axelar.tfl.foundation")
+            ) {
               return result
             }
 
             const requests = await Promise.all(
-              EVENTS.map((event) => {
-                return axios.get<AccountHistory>(`/cosmos/tx/v1beta1/txs`, {
-                  baseURL: networks[chain].lcd,
-                  params: {
-                    events: `${event}='${address}'`,
-                    //order_by: "ORDER_BY_DESC",
-                    [paginationKeys.offset]: 0 || undefined,
-                    [paginationKeys.reverse]: isTerra ? 2 : true,
-                    [paginationKeys.limit]: LIMIT,
-                  },
-                })
-              })
+              EVENTS.map((event) =>
+                axios
+                  .get<AccountHistory>(`/cosmos/tx/v1beta1/txs`, {
+                    baseURL: lcd,
+                    params: {
+                      events: `${event}='${address}'`,
+                      [paginationKeys.offset]: 0 || undefined,
+                      [paginationKeys.reverse]: isTerra ? 2 : true,
+                      [paginationKeys.limit]: LIMIT,
+                    },
+                  })
+                  .catch(() => ({
+                    data: {
+                      tx_responses: [],
+                      pagination: {
+                        next_key: null,
+                        total: "0",
+                      },
+                    } as unknown as AccountHistory,
+                  })),
+              ),
             )
 
             for (const { data } of requests) {
-              data.tx_responses.forEach((tx) => {
+              const txResponses = Array.isArray(data?.tx_responses)
+                ? data.tx_responses
+                : []
+
+              txResponses.forEach((tx) => {
                 if (!txhases.includes(tx.txhash)) {
                   result.push(tx)
                   txhases.push(tx.txhash)
@@ -106,7 +121,7 @@ const HistoryList = ({ chainID }: Props) => {
               .map((tx) => ({ ...tx, chain }))
           },
         }
-      })
+      }),
   )
 
   const state = combineState(...historyData)
@@ -114,7 +129,7 @@ const HistoryList = ({ chainID }: Props) => {
     .reduce((acc, { data }) => (data ? [...acc, ...data] : acc), [] as any[])
     .sort(
       (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     )
     .slice(0, LIMIT)
 

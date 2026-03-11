@@ -1,17 +1,51 @@
 const webpack = require("webpack")
+const path = require("path")
+
+function patchSassLoader(rules) {
+  if (!Array.isArray(rules)) return
+
+  for (const rule of rules) {
+    if (Array.isArray(rule.oneOf)) {
+      patchSassLoader(rule.oneOf)
+    }
+
+    if (Array.isArray(rule.rules)) {
+      patchSassLoader(rule.rules)
+    }
+
+    if (!Array.isArray(rule.use)) continue
+
+    for (const useEntry of rule.use) {
+      if (
+        useEntry &&
+        typeof useEntry === "object" &&
+        typeof useEntry.loader === "string" &&
+        useEntry.loader.includes("sass-loader")
+      ) {
+        useEntry.options = {
+          ...(useEntry.options || {}),
+          api: "modern",
+          sassOptions: {
+            ...((useEntry.options && useEntry.options.sassOptions) || {}),
+            loadPaths: [
+              path.resolve(__dirname),
+              path.resolve(__dirname, "src"),
+            ],
+          },
+        }
+      }
+    }
+  }
+}
 
 module.exports = {
   webpack: {
     configure: (webpackConfig) => {
       webpackConfig.ignoreWarnings = [
         ...(webpackConfig.ignoreWarnings || []),
-
-        // Ignore broken/missing source maps from third-party packages in node_modules
         (warning) =>
           typeof warning?.message === "string" &&
           warning.message.includes("Failed to parse source map"),
-
-        // Extra-safe fallback for source-map-loader module warnings
         {
           module: /node_modules/,
           message: /Failed to parse source map/,
@@ -36,6 +70,8 @@ module.exports = {
           process: ["process"],
         }),
       ]
+
+      patchSassLoader(webpackConfig.module?.rules)
 
       return webpackConfig
     },

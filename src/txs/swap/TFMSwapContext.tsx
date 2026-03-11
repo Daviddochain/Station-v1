@@ -35,7 +35,7 @@ interface TFMSwap {
     coins: TokenItemWithBalance[]
     tokens: TokenItemWithBalance[]
   }
-  findTokenItem: (token: Token) => TokenItemWithBalance
+  findTokenItem: (token: Token) => TokenItemWithBalance | undefined
   findDecimals: (token: Token) => number
 }
 
@@ -62,7 +62,9 @@ const TFMSwapContext = ({ children }: PropsWithChildren<{}>) => {
   const availableList = useMemo(() => {
     if (!(TFMTokens && ibcWhitelist && cw20Whitelist)) return
 
-    const tokens = TFMTokens.map(({ contract_addr }) => contract_addr)
+    const tokens = TFMTokens.map((item) => item.denom).filter(
+      (value): value is string => !!value,
+    )
 
     const ibc = tokens
       .filter(isDenomIBC)
@@ -90,7 +92,7 @@ const TFMSwapContext = ({ children }: PropsWithChildren<{}>) => {
       cw20TokensBalancesState.map(({ data }) => {
         if (!data) throw new Error()
         return data
-      })
+      }),
     )
   }, [cw20TokensBalanceRequired, cw20TokensBalancesState])
 
@@ -116,32 +118,30 @@ const TFMSwapContext = ({ children }: PropsWithChildren<{}>) => {
       return { ...cw20Whitelist[token], balance }
     })
 
+    const extraIbcTokens = Object.entries(ibcDenoms[networkName] ?? {})
+      .filter(([_, { chainID }]) => chainID === terraChainID)
+      .map(([ibc, { token, chainID }]) => ({
+        ...readNativeDenom(token, chainID),
+        token: ibc.split(":")[1],
+        balance: getAmount(bankBalance, token),
+      }))
+      .filter((entry) => (entry.isNonWhitelisted ? false : true))
+
     const options = {
       coins,
-      tokens: [
-        ...ibc,
-        ...cw20,
-        ...Object.entries(ibcDenoms[networkName] ?? {})
-          .filter(([_, { chainID }]) => chainID === terraChainID)
-          .map(([ibc, { token, chainID }]) => ({
-            ...readNativeDenom(token, chainID),
-            token: ibc.split(":")[1],
-            balance: getAmount(bankBalance, token),
-          }))
-          .filter((entry) => (entry.isNonWhitelisted ? false : true)),
-      ],
+      tokens: [...ibc, ...cw20, ...extraIbcTokens],
     }
 
-    const findTokenItem = (token: Token) => {
+    const findTokenItem = (token: Token): TokenItemWithBalance | undefined => {
+      if (!token) return undefined
+
       const key =
         AccAddress.validate(token) || isDenomIBC(token) ? "tokens" : "coins"
 
-      const option = options[key].find((item) => item.token === token)
-      if (!option) throw new Error()
-      return option
+      return options[key].find((item) => item.token === token)
     }
 
-    const findDecimals = (token: Token) => findTokenItem(token).decimals
+    const findDecimals = (token: Token) => findTokenItem(token)?.decimals ?? 6
 
     return { options, findTokenItem, findDecimals }
   }, [
@@ -160,7 +160,7 @@ const TFMSwapContext = ({ children }: PropsWithChildren<{}>) => {
     ibcWhitelistState,
     cw20WhitelistState,
     TFMTokensState,
-    ...cw20TokensBalancesState
+    ...cw20TokensBalancesState,
   )
 
   const render = () => {
@@ -175,7 +175,7 @@ export default TFMSwapContext
 
 /* type */
 export const validateTFMSlippageParams = (
-  params: Partial<SlippageParams>
+  params: Partial<SlippageParams>,
 ): params is SlippageParams => {
   const { input, slippageInput, ...assets } = params
   return !!(validateAssets(assets) && input && slippageInput)

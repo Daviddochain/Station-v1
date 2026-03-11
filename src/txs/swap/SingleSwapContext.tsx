@@ -36,7 +36,7 @@ interface SingleSwap {
     coins: TokenItemWithBalance[]
     tokens: TokenItemWithBalance[]
   }
-  findTokenItem: (token: Token) => TokenItemWithBalance
+  findTokenItem: (token: Token) => TokenItemWithBalance | undefined
   findDecimals: (token: Token) => number
   calcExpected: (params: SlippageParams) => SwapSpread
 }
@@ -63,7 +63,7 @@ const SingleSwapContext = ({ children }: PropsWithChildren<{}>) => {
     if (!(ibcWhitelist && cw20Whitelist)) return
 
     const terraswapAvailableList = uniq(
-      flatten(Object.values(pairs ?? {}).map(({ assets }) => assets))
+      flatten(Object.values(pairs ?? {}).map(({ assets }) => assets)),
     )
 
     const ibc = terraswapAvailableList
@@ -81,7 +81,7 @@ const SingleSwapContext = ({ children }: PropsWithChildren<{}>) => {
   const cw20TokensBalanceRequired = useMemo(() => {
     if (!terraswapAvailableList) return []
     return customTokens.filter((token) =>
-      terraswapAvailableList.cw20.includes(token)
+      terraswapAvailableList.cw20.includes(token),
     )
   }, [customTokens, terraswapAvailableList])
 
@@ -94,7 +94,7 @@ const SingleSwapContext = ({ children }: PropsWithChildren<{}>) => {
       cw20TokensBalancesState.map(({ data }) => {
         if (!data) throw new Error()
         return data
-      })
+      }),
     )
   }, [cw20TokensBalanceRequired, cw20TokensBalancesState])
 
@@ -120,16 +120,16 @@ const SingleSwapContext = ({ children }: PropsWithChildren<{}>) => {
 
     const options = { coins, tokens: [...ibc, ...cw20] }
 
-    const findTokenItem = (token: Token) => {
+    const findTokenItem = (token: Token): TokenItemWithBalance | undefined => {
+      if (!token) return undefined
+
       const key =
         AccAddress.validate(token) || isDenomIBC(token) ? "tokens" : "coins"
 
-      const option = options[key].find((item) => item.token === token)
-      if (!option) throw new Error()
-      return option
+      return options[key].find((item) => item.token === token)
     }
 
-    const findDecimals = (token: Token) => findTokenItem(token).decimals
+    const findDecimals = (token: Token) => findTokenItem(token)?.decimals ?? 6
 
     const calcExpected = (params: SlippageParams) => {
       const { offerAsset, askAsset, input, slippageInput, ratio } = params
@@ -150,7 +150,7 @@ const SingleSwapContext = ({ children }: PropsWithChildren<{}>) => {
       /* expected price */
       const decimals = askDecimals - offerDecimals
       const price = toPrice(
-        new BigNumber(ratio).times(new BigNumber(10).pow(decimals))
+        new BigNumber(ratio).times(new BigNumber(10).pow(decimals)),
       )
 
       return { max_spread, belief_price, minimum_receive, price }
@@ -171,7 +171,7 @@ const SingleSwapContext = ({ children }: PropsWithChildren<{}>) => {
   const state = combineState(
     ibcWhitelistState,
     cw20WhitelistState,
-    ...cw20TokensBalancesState
+    ...cw20TokensBalancesState,
   )
 
   const render = () => {
@@ -186,7 +186,7 @@ export default SingleSwapContext
 
 /* type */
 export const validateSlippageParams = (
-  params: Partial<SlippageParams>
+  params: Partial<SlippageParams>,
 ): params is SlippageParams => {
   const { input, slippageInput, ratio, ...assets } = params
   return !!(validateAssets(assets) && input && slippageInput && ratio)
@@ -195,7 +195,7 @@ export const validateSlippageParams = (
 /* minimum received */
 export const calcMinimumReceive = (
   simulatedValue: Value,
-  max_spread: string
+  max_spread: string,
 ) => {
   const minRatio = new BigNumber(1).minus(max_spread)
   const value = new BigNumber(simulatedValue).times(minRatio)

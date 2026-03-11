@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next"
 import { useLocation } from "react-router-dom"
 import { useQuery } from "react-query"
 import { useForm } from "react-hook-form"
-import update from "immutability-helper"
 import BigNumber from "bignumber.js"
 import { AccAddress, Coin, Coins } from "@terra-money/feather.js"
 import { MsgExecuteContract } from "@terra-money/feather.js"
@@ -49,6 +48,29 @@ interface TxValues {
   askAsset: string
   input: number | undefined
   slippageInput: number
+}
+
+interface TFMRouteLike {
+  return_amount?: string
+  input_amount?: string
+  price_impact?: number | string
+}
+
+interface TFMCoinLike {
+  denom: string
+  amount: string
+}
+
+interface TFMSwapValueLike {
+  contract?: string
+  execute_msg?: Record<string, unknown>
+  coins?: TFMCoinLike[]
+}
+
+interface TFMSwapLike {
+  success?: boolean
+  value?: TFMSwapValueLike
+  error?: string
 }
 
 const TFMSwapForm = ({ chainID }: { chainID: string }) => {
@@ -105,19 +127,22 @@ const TFMSwapForm = ({ chainID }: { chainID: string }) => {
 
   const assets = useMemo(
     () => ({ offerAsset, askAsset }),
-    [offerAsset, askAsset]
+    [offerAsset, askAsset],
   )
 
   const slippageParams = useMemo(
     () => ({ offerAsset, askAsset, input, slippageInput }),
-    [offerAsset, askAsset, input, slippageInput]
+    [offerAsset, askAsset, input, slippageInput],
   )
 
   const offerTokenItem = offerAsset ? findTokenItem(offerAsset) : undefined
-  const offerDecimals = offerAsset ? findDecimals(offerAsset) : undefined
-  const askDecimals = askAsset ? findDecimals(askAsset) : undefined
+  const offerDecimals = offerAsset ? findDecimals(offerAsset) : 6
+  const askDecimals = askAsset ? findDecimals(askAsset) : 6
 
-  const amount = toAmount(input, { decimals: offerDecimals })
+  const amount =
+    typeof input === "number" && Number.isFinite(input)
+      ? toAmount(input, { decimals: offerDecimals })
+      : ""
 
   const swapAssets = () => {
     setValue("offerAsset", askAsset)
@@ -127,26 +152,36 @@ const TFMSwapForm = ({ chainID }: { chainID: string }) => {
   }
 
   /* simulate | execute */
-  const slippage = new BigNumber(slippageInput!).div(100).toString()
+  const slippage = new BigNumber(slippageInput ?? 0).div(100).toString()
   const params = { ...assets, amount, slippage }
+  const canSimulate = validateParams(params) && !!askAsset && !!offerAsset
 
   /* simulate */
   const { data: simulationResults, isFetching } = useQuery(
     ["TFM.simulate.swap", params],
     async () => {
-      if (!validateParams(params)) throw new Error()
-      const route = await queryTFMRoute(toTFMParams(params))
-      const swap = await queryTFMSwap(toTFMParams(params))
+      if (!canSimulate) return null
+
+      const tfmParams = toTFMParams(params)
+      const route = await queryTFMRoute(tfmParams)
+      const swap = await queryTFMSwap(tfmParams)
+
       return [route, swap] as const
     },
-    { enabled: validateParams(params) }
+    {
+      enabled: canSimulate,
+      retry: false,
+    },
   )
 
+  const routeResult = simulationResults?.[0] as TFMRouteLike | null | undefined
+  const swapResult = simulationResults?.[1] as TFMSwapLike | null | undefined
+
   const simulatedValue = useMemo(() => {
-    if (!(simulationResults && askDecimals)) return
-    const [{ return_amount }] = simulationResults
-    return toAmount(return_amount, { decimals: askDecimals })
-  }, [askDecimals, simulationResults])
+    const returnAmount = routeResult?.return_amount
+    if (!returnAmount) return
+    return toAmount(returnAmount, { decimals: askDecimals })
+  }, [askDecimals, routeResult])
 
   /* Select asset */
   const onSelectAsset = (key: "offerAsset" | "askAsset") => {
@@ -156,12 +191,10 @@ const TFMSwapForm = ({ chainID }: { chainID: string }) => {
         askAsset: { offerAsset, askAsset: value },
       }[key]
 
-      // empty opposite asset if select the same asset
       if (assets.offerAsset === assets.askAsset) {
         setValue(key === "offerAsset" ? "askAsset" : "offerAsset", "")
       }
 
-      // focus on input if select offer asset
       if (key === "offerAsset") {
         form.resetField("input")
         form.setFocus("input")
@@ -173,41 +206,58 @@ const TFMSwapForm = ({ chainID }: { chainID: string }) => {
 
   /* tx */
   const balance = offerTokenItem?.balance
+
   const createTx = useCallback(() => {
     if (!address) return
     if (!offerAsset) return
-    if (!simulationResults) return
+    if (!swapResult?.value) return
 
-    const [, swap] = simulationResults
+    const value = swapResult.value
+    const executeMsg = value.execute_msg
 
-    if (!("value" in swap)) return
+    if (!executeMsg || typeof executeMsg !== "object") return
 
-    const { value } = swap
-    const contract = AccAddress.validate(value.contract)
-      ? value.contract
-      : TFM_ROUTER
+    const contract =
+      value.contract && AccAddress.validate(value.contract)
+        ? value.contract
+        : TFM_ROUTER
 
-    const execute_msg = AccAddress.validate(offerAsset)
-      ? update(value.execute_msg, { send: { contract: { $set: TFM_ROUTER } } })
-      : value.execute_msg
+    const finalExecuteMsg =
+      AccAddress.validate(offerAsset) &&
+      "send" in executeMsg &&
+      executeMsg.send &&
+      typeof executeMsg.send === "object"
+        ? {
+            ...executeMsg,
+            send: {
+              ...(executeMsg.send as Record<string, unknown>),
+              contract: TFM_ROUTER,
+            },
+          }
+        : executeMsg
 
-    const coins = new Coins(value.coins.map(Coin.fromData))
+    const coins = new Coins(
+      (value.coins ?? []).map((coin) =>
+        Coin.fromData({
+          denom: coin.denom,
+          amount: coin.amount,
+        }),
+      ),
+    )
 
     return {
-      msgs: [new MsgExecuteContract(address, contract, execute_msg, coins)],
+      msgs: [new MsgExecuteContract(address, contract, finalExecuteMsg, coins)],
       chainID,
     }
-  }, [address, offerAsset, simulationResults, chainID])
+  }, [address, offerAsset, swapResult, chainID])
 
   /* fee */
   const { data: estimationTxValues } = useQuery(
-    ["estimationTxValues", { assets }],
+    ["estimationTxValues", { assets, input, slippageInput }],
     async () => {
       if (!validateAssets(assets)) return
-      const { offerAsset, askAsset } = assets
-      // estimate fee only after ratio simulated
       return { offerAsset, askAsset, input, slippageInput: 1 }
-    }
+    },
   )
 
   const token = offerAsset
@@ -241,14 +291,19 @@ const TFMSwapForm = ({ chainID }: { chainID: string }) => {
 
   /* render: expected price */
   const renderExpected = () => {
-    if (!(simulatedValue && simulationResults)) return null
+    if (!simulatedValue) return null
     if (!validateTFMSlippageParams(slippageParams)) return null
+    if (!routeResult?.return_amount || !routeResult?.input_amount) return null
 
-    const [{ return_amount, input_amount, price_impact }] = simulationResults
+    const inputAmount = new BigNumber(routeResult.input_amount)
+    const returnAmount = new BigNumber(routeResult.return_amount)
+
+    if (returnAmount.isZero()) return null
+
     const expected = {
       minimum_receive: calcMinimumReceive(simulatedValue, slippage),
-      price: new BigNumber(input_amount).div(return_amount).toNumber(),
-      price_impact,
+      price: inputAmount.div(returnAmount).toNumber(),
+      price_impact: Number(routeResult.price_impact ?? 0),
     }
 
     const props = { ...slippageParams, ...expected }
@@ -258,11 +313,11 @@ const TFMSwapForm = ({ chainID }: { chainID: string }) => {
   const slippageDisabled = [offerAsset, askAsset].every(isDenomTerra)
 
   const isFailed = useMemo(() => {
-    if (!simulationResults) return false
-    const [, swap] = simulationResults
-    if ("success" in swap && !swap.success) return true
+    if (!swapResult) return false
+    if (swapResult.success === false) return true
+    if (swapResult.error) return true
     return false
-  }, [simulationResults])
+  }, [swapResult])
 
   return (
     <Tx {...tx} disabled={disabled}>
@@ -271,11 +326,10 @@ const TFMSwapForm = ({ chainID }: { chainID: string }) => {
           <FormWarning>
             {t("Leave coins to pay fees for subsequent transactions")}
           </FormWarning>
+
           <AssetFormItem
             label={t("From")}
             extra={max.render(async (value) => {
-              // Do not use automatic max here
-              // Confusion arises as the amount changes and simulates again
               setValue("input", toInput(value, offerDecimals))
               await trigger("input")
             })}
@@ -299,7 +353,7 @@ const TFMSwapForm = ({ chainID }: { chainID: string }) => {
                     valueAsNumber: true,
                     validate: validate.input(
                       toInput(max.amount, offerDecimals),
-                      offerDecimals ?? 6
+                      offerDecimals ?? 6,
                     ),
                   })}
                   inputMode="decimal"
@@ -346,7 +400,7 @@ const TFMSwapForm = ({ chainID }: { chainID: string }) => {
                 valueAsNumber: true,
                 validate: validate.input(50, 2, "Slippage tolerance"),
               })}
-              input={slippageInput} // to warn
+              input={slippageInput}
               inputMode="decimal"
               type="number"
               placeholder={getPlaceholder(2)}

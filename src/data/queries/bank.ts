@@ -6,6 +6,7 @@ import { useInterchainAddresses } from "auth/hooks/useAddress"
 import { useCustomTokensCW20 } from "data/settings/CustomTokens"
 import { useNetwork } from "data/wallet"
 import { getChainIDFromAddress } from "utils/bech32"
+import axios from "axios"
 
 const isBrowser = typeof window !== "undefined"
 
@@ -27,6 +28,20 @@ const isLocalHost = (hostname: string) => {
   )
 }
 
+const isAllowedBrowserLCDHost = (hostname: string) => {
+  const host = hostname.toLowerCase()
+
+  return (
+    host.includes("publicnode.com") ||
+    host.includes("terra.dev") ||
+    host.includes("lunaclassicstation.com") ||
+    host.includes("terra-classic") ||
+    host.includes("localhost") ||
+    host === "127.0.0.1" ||
+    host === "0.0.0.0"
+  )
+}
+
 const canBrowserCallLCD = (lcd?: string) => {
   const target = parseURL(lcd)
   if (!target) return false
@@ -37,8 +52,28 @@ const canBrowserCallLCD = (lcd?: string) => {
 
   if (target.origin === current.origin) return true
   if (isLocalHost(target.hostname) && isLocalHost(current.hostname)) return true
+  if (isAllowedBrowserLCDHost(target.hostname)) return true
 
   return false
+}
+
+const normalizeCoins = (bal: any) => {
+  if (Array.isArray(bal)) {
+    return bal[0]?.toArray?.() ?? []
+  }
+
+  return bal?.toArray?.() ?? []
+}
+
+const fetchClassicBankBalances = async (lcd: string, address: string) => {
+  const { data } = await axios.get<{
+    balances?: Array<{ denom: string; amount: string }>
+  }>(`/cosmos/bank/v1beta1/balances/${address}`, {
+    baseURL: lcd,
+    timeout: 10000,
+  })
+
+  return Array.isArray(data?.balances) ? data.balances : []
 }
 
 export interface CoinBalance {
@@ -118,13 +153,25 @@ export const useInitialBankBalance = () => {
       return {
         queryKey: [queryKey.bank.balances, address, chainID],
         queryFn: async () => {
-          if (!enabled) return [] as CoinBalance[]
+          if (!enabled || !network?.lcd) return [] as CoinBalance[]
+
+          if (chainID === "columbus-5") {
+            const coins = await fetchClassicBankBalances(network.lcd, address)
+
+            return coins.map(({ denom, amount }) => ({
+              denom,
+              amount,
+              chain: chainID,
+            })) as CoinBalance[]
+          }
 
           const bal = ["phoenix-1", "pisco-1"].includes(chainID)
             ? await lcd.bank.spendableBalances(address)
             : await lcd.bank.balance(address)
 
-          return bal[0].toArray().map(({ denom, amount }) => ({
+          const coins = normalizeCoins(bal)
+
+          return coins.map(({ denom, amount }: any) => ({
             denom,
             amount: amount.toString(),
             chain: chainID,
@@ -158,19 +205,40 @@ export const useBalances = () => {
       if (!eligibleChains.length) return [] as CoinBalance[]
 
       const balances = await Promise.all(
-        eligibleChains.map((chain) => {
+        eligibleChains.map(async (chain) => {
           const address = addresses[chain]
+          const network = networks?.[chain]
+
+          if (chain === "columbus-5" && network?.lcd) {
+            return await fetchClassicBankBalances(network.lcd, address)
+          }
 
           return ["phoenix-1", "pisco-1"].includes(chain)
-            ? lcd.bank.spendableBalances(address)
-            : lcd.bank.balance(address)
+            ? await lcd.bank.spendableBalances(address)
+            : await lcd.bank.balance(address)
         }),
       )
 
       const result = [] as CoinBalance[]
 
       eligibleChains.forEach((chain, i) => {
-        balances[i][0].toArray().forEach(({ denom, amount }) =>
+        if (chain === "columbus-5") {
+          const coins = Array.isArray(balances[i]) ? balances[i] : []
+
+          coins.forEach(({ denom, amount }: any) =>
+            result.push({
+              denom,
+              amount: amount.toString(),
+              chain,
+            }),
+          )
+
+          return
+        }
+
+        const coins = normalizeCoins(balances[i])
+
+        coins.forEach(({ denom, amount }: any) =>
           result.push({
             denom,
             amount: amount.toString(),
