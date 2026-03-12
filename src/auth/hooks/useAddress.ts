@@ -8,7 +8,7 @@ import { walletState } from "../state/walletState"
 
 type WalletWordsMap = Record<string, string | undefined>
 
-/* auth | wallet-provider */
+/* current chain address: auth | wallet-provider */
 const useAddress = () => {
   const connected = useConnectedWallet()
   const { wallet } = useAuth()
@@ -29,6 +29,11 @@ const useAddress = () => {
   if (!seed) return undefined
 
   return addressFromWords(seed, currentNetwork.prefix)
+}
+
+export const useIsWalletConnected = () => {
+  const connected = useConnectedWallet()
+  return !!connected
 }
 
 export const useAllInterchainAddresses = () => {

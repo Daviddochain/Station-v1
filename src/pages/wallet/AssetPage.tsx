@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { useNativeDenoms } from "data/token"
 import { useWalletRoute, Path } from "./Wallet"
 import styles from "./AssetPage.module.scss"
@@ -22,22 +23,58 @@ const AssetPage = () => {
   const { t } = useTranslation()
   const { setRoute, route } = useWalletRoute()
   const networkName = useNetworkName()
-  const routeDenom = route.path === Path.coin ? route.denom ?? "uluna" : "uluna"
+
+  const routeDenom =
+    route.path === Path.coin ? (route.denom ?? "uluna") : "uluna"
+
   const [chain, denom] = routeDenom.includes("*")
     ? routeDenom.split("*")
     : [undefined, routeDenom]
+
   const { token, symbol, icon, decimals } = readNativeDenom(denom, chain)
 
   const isLuncOffClassic = symbol === "LUNC" && networkName !== "classic"
 
-  let price
-  if (isLuncOffClassic) {
-    price = prices?.["uluna:classic"]?.price ?? 0
-  } else if (!symbol.endsWith("...")) {
-    price = prices?.[token]?.price ?? 0
-  } else {
-    price = 0
-  }
+  const resolvedPriceEntry = useMemo(() => {
+    if (!prices) return undefined
+
+    if (symbol === "LUNC") {
+      return (
+        prices["uluna:classic"] ??
+        prices["lunc"] ??
+        prices[`${denom}:classic`] ??
+        prices[`${routeDenom}:classic`] ??
+        prices[token] ??
+        prices[denom] ??
+        prices[routeDenom]
+      )
+    }
+
+    if (symbol === "LUNA") {
+      return (
+        prices["uluna:phoenix"] ??
+        prices["luna2"] ??
+        prices[`${denom}:phoenix`] ??
+        prices[`${routeDenom}:phoenix`] ??
+        prices[token] ??
+        prices[denom] ??
+        prices[routeDenom]
+      )
+    }
+
+    return (
+      prices[token] ??
+      prices[denom] ??
+      prices[routeDenom] ??
+      prices[symbol?.toLowerCase?.() ?? ""] ??
+      prices[`${denom}:classic`] ??
+      prices[`${denom}:phoenix`]
+    )
+  }, [prices, symbol, token, denom, routeDenom])
+
+  const price = symbol?.endsWith("...")
+    ? 0
+    : Number(resolvedPriceEntry?.price ?? 0)
 
   const unknownIBCDenomsData = useIBCBaseDenoms(
     balances
@@ -45,7 +82,7 @@ const AssetPage = () => {
       .filter(({ denom, chainID }) => {
         const data = readNativeDenom(denom, chainID)
         return denom.startsWith("ibc/") && data.symbol.endsWith("...")
-      })
+      }),
   )
 
   const unknownIBCDenoms = unknownIBCDenomsData.reduce(
@@ -54,14 +91,14 @@ const AssetPage = () => {
         ? {
             ...acc,
             [[data.ibcDenom, data.chainIDs[data.chainIDs.length - 1]].join(
-              "*"
+              "*",
             )]: {
               baseDenom: data.baseDenom,
               chains: data?.chainIDs,
             },
           }
         : acc,
-    {} as Record<string, { baseDenom: string; chains: string[] }>
+    {} as Record<string, { baseDenom: string; chains?: string[] }>,
   )
 
   const filteredBalances = balances.filter((b) => {
@@ -72,7 +109,6 @@ const AssetPage = () => {
   })
 
   const filteredUnsupportedBalances = balances.filter((b) => {
-    // only return unsupported token if the current chain is found in the ibc path
     if (chain) {
       return (
         unknownIBCDenoms[[b.denom, b.chain].join("*")]?.baseDenom === token &&
@@ -88,14 +124,29 @@ const AssetPage = () => {
     ...filteredUnsupportedBalances,
   ].reduce((acc, b) => acc + parseInt(b.amount), 0)
 
+  const normalizedTotalBalance = totalBalance / Math.pow(10, decimals ?? 6)
+  const totalValue = normalizedTotalBalance * price
+
+  const displayFixed =
+    totalValue > 0 && totalValue < 0.01
+      ? 8
+      : totalValue >= 0.01 && totalValue < 1
+        ? 4
+        : 2
+
   return (
     <>
       <section className={styles.details}>
         <TokenIcon token={token} icon={icon} size={50} />
         <h1>
           {currency.symbol}{" "}
-          {price ? (
-            <Read decimals={decimals} amount={totalBalance * price} fixed={2} />
+          {price > 0 ? (
+            <Read
+              amount={totalValue}
+              decimals={0}
+              fixed={displayFixed}
+              denom=""
+            />
           ) : (
             <span>—</span>
           )}
@@ -104,6 +155,7 @@ const AssetPage = () => {
           <Read decimals={decimals} amount={totalBalance} fixed={2} /> {symbol}
         </p>
       </section>
+
       <section className={styles.chainlist__container}>
         {filteredBalances.length > 0 && (
           <div className={styles.chainlist}>
@@ -131,6 +183,7 @@ const AssetPage = () => {
             </div>
           </div>
         )}
+
         {filteredUnsupportedBalances.length > 0 && (
           <div className={styles.chainlist}>
             <div className={styles.chainlist__title}>

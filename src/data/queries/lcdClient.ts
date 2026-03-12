@@ -20,9 +20,15 @@ export const useLCDClient = () => {
   const lcdClient = useMemo(() => {
     const selected =
       (chainID && network?.[chainID]) ||
-      Object.values(network ?? {}).find(
-        (item) => !!item && typeof item.lcd === "string" && !!item.lcd,
-      )
+      Object.values(network ?? {}).find((item) => {
+        return (
+          !!item &&
+          typeof item === "object" &&
+          "lcd" in item &&
+          typeof item.lcd === "string" &&
+          !!item.lcd
+        )
+      })
 
     if (!selected || typeof selected.lcd !== "string") {
       throw new Error("No valid LCD network configuration found")

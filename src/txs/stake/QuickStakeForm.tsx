@@ -62,7 +62,7 @@ const QuickStakeForm = (props: Props) => {
   const { data: validators, ...validatorState } = useValidators(chainID)
   const { data: delegations, ...delegationsState } = useDelegations(
     chainID,
-    isAlliance || action === QuickStakeAction.DELEGATE
+    isAlliance || action === QuickStakeAction.DELEGATE,
   )
   const allianceHub = useAllianceHub()
   const { data: allianceHubDelegations, ...allianceHubDelegationsState } =
@@ -75,7 +75,7 @@ const QuickStakeForm = (props: Props) => {
   const { data: allianceDelegations, ...allianceDelegationsState } =
     useAllianceDelegations(
       chainID,
-      !isAlliance || action === QuickStakeAction.DELEGATE
+      !isAlliance || action === QuickStakeAction.DELEGATE,
     )
 
   const readNativeDenom = useNativeDenoms()
@@ -85,7 +85,7 @@ const QuickStakeForm = (props: Props) => {
     delegationsState,
     stakeState,
     allianceDelegationsState,
-    allianceHubDelegationsState
+    allianceHubDelegationsState,
   )
   const allianceHubContract = allianceHub.useHubAddress()
 
@@ -101,7 +101,7 @@ const QuickStakeForm = (props: Props) => {
 
   const amount = toAmount(
     input,
-    decimals ? { decimals } : { decimals: DEFAULT_NATIVE_DECIMALS }
+    decimals ? { decimals } : { decimals: DEFAULT_NATIVE_DECIMALS },
   )
 
   const daysToUnbond = getChainUnbondTime(stakeParams?.unbonding_time)
@@ -118,8 +118,8 @@ const QuickStakeForm = (props: Props) => {
       denom,
       toAmount(
         input || toInput(1),
-        decimals ? { decimals } : { decimals: DEFAULT_NATIVE_DECIMALS }
-      )
+        decimals ? { decimals } : { decimals: DEFAULT_NATIVE_DECIMALS },
+      ),
     )
 
     return getQuickStakeMsgs(
@@ -129,7 +129,7 @@ const QuickStakeForm = (props: Props) => {
       decimals,
       isAlliance,
       allianceHubContract,
-      stakeOnAllianceHub
+      stakeOnAllianceHub,
     )
   }, [
     address,
@@ -149,19 +149,18 @@ const QuickStakeForm = (props: Props) => {
       denom,
       toAmount(
         input || toInput(1),
-        decimals ? { decimals } : { decimals: DEFAULT_NATIVE_DECIMALS }
-      )
+        decimals ? { decimals } : { decimals: DEFAULT_NATIVE_DECIMALS },
+      ),
     )
     return getQuickUnstakeMsgs(
       address,
       coin,
       {
         isAlliance,
-        // @ts-expect-error
         delegations: isAlliance ? allianceDelegations : delegations,
       },
       allianceHubContract,
-      stakeOnAllianceHub
+      stakeOnAllianceHub,
     )
   }, [
     address,
@@ -183,7 +182,7 @@ const QuickStakeForm = (props: Props) => {
       if (!msgs) return
       return { msgs, chainID }
     },
-    [action, unstakeMsgs, stakeMsgs, chainID]
+    [action, unstakeMsgs, stakeMsgs, chainID],
   )
 
   const calculateUnbondBalance = () => {
@@ -208,7 +207,7 @@ const QuickStakeForm = (props: Props) => {
 
   /* fee */
   const balance = {
-    [QuickStakeAction.DELEGATE]: getAmount(balances, denom), // TODO flexible denom
+    [QuickStakeAction.DELEGATE]: getAmount(balances, denom),
     [QuickStakeAction.UNBOND]: calculateUnbondBalance(),
   }[action]
 
@@ -219,7 +218,7 @@ const QuickStakeForm = (props: Props) => {
       setValue("input", input)
       await trigger("input")
     },
-    [setValue, trigger]
+    [setValue, trigger],
   )
 
   const asset = readNativeDenom(denom)
@@ -292,9 +291,9 @@ const QuickStakeForm = (props: Props) => {
                     validate: validate.input(
                       toInput(
                         max.amount,
-                        decimals ? decimals : DEFAULT_NATIVE_DECIMALS
+                        decimals ? decimals : DEFAULT_NATIVE_DECIMALS,
                       ),
-                      decimals ? decimals : DEFAULT_NATIVE_DECIMALS
+                      decimals ? decimals : DEFAULT_NATIVE_DECIMALS,
                     ),
                   })}
                   type="number"
@@ -349,7 +348,7 @@ const QuickStakeForm = (props: Props) => {
                   [QuickStakeAction.DELEGATE]: (
                     <FormWarning>
                       {t(
-                        "Leave enough coins to pay fee for subsequent transactions"
+                        "Leave enough coins to pay fee for subsequent transactions",
                       )}
                     </FormWarning>
                   ),
@@ -357,14 +356,14 @@ const QuickStakeForm = (props: Props) => {
                     <Grid gap={4}>
                       <FormWarning>
                         {t(
-                          "A maximum 7 undelegations can be in progress at the same time"
+                          "A maximum 7 undelegations can be in progress at the same time",
                         )}
                       </FormWarning>
                       {!stakeOnAllianceHub && (
                         <FormWarning>
                           {t(
                             "Undelegating funds do not accrue rewards and are locked for {{daysToUnbond}} days",
-                            { daysToUnbond }
+                            { daysToUnbond },
                           )}
                         </FormWarning>
                       )}

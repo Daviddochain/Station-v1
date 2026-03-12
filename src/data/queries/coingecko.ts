@@ -1,10 +1,10 @@
 import { useCallback } from "react"
 import { useQuery } from "react-query"
 import { queryKey, RefetchOptions } from "../query"
-import { CURRENCY_KEY, STATION_ASSETS, ASSETS } from "config/constants"
+import { STATION_ASSETS, ASSETS } from "config/constants"
 import axios from "axios"
 import { useCurrency } from "data/settings/Currency"
-import { useNetworkName } from "data/wallet"
+import { useChainID } from "data/wallet"
 
 // TODO: remove/move somewhere else
 export const useActiveDenoms = () => {
@@ -57,12 +57,6 @@ type PriceObject = Record<
   }
 >
 
-const COINGECKO_IDS: Record<string, string> = {
-  uluna: "terra",
-  uluna_classic: "terra-luna-classic",
-  uusd: "terraclassicusd",
-}
-
 const queryStationAliases = async () => {
   try {
     const { data } = await axios.get<Record<string, string>>(
@@ -88,75 +82,103 @@ const queryStationAliases = async () => {
 const queryCoinGeckoPrices = async (): Promise<
   Record<string, ExternalPrice>
 > => {
-  try {
-    const ids = Array.from(new Set(Object.values(COINGECKO_IDS)))
-    if (!ids.length) return {}
+  return {}
+}
 
-    const { data } = await axios.get<
-      Record<string, { usd?: number; usd_24h_change?: number }>
-    >("https://api.coingecko.com/api/v3/simple/price", {
-      params: {
-        ids: ids.join(","),
-        vs_currencies: "usd",
-        include_24hr_change: true,
-      },
+const queryCMCPrices = async (): Promise<Record<string, ExternalPrice>> => {
+  try {
+    const response = await axios.get<
+      Record<string, { price?: number; change?: number }>
+    >("http://localhost:3001/api/prices", {
       timeout: 10000,
     })
 
+    const data = response?.data
+
     if (!data || typeof data !== "object" || Array.isArray(data)) {
-      console.warn("Invalid CoinGecko price response format")
+      console.warn("Invalid backend price response format", data)
       return {}
     }
 
-    const result: Record<string, ExternalPrice> = {}
-
-    Object.entries(COINGECKO_IDS).forEach(([denom, id]) => {
-      const entry = data[id]
-      result[denom] = {
-        usd: entry?.usd ?? 0,
-        change24h: entry?.usd_24h_change ?? 0,
-      }
+    const toExternalPrice = (entry?: {
+      price?: number
+      change?: number
+    }): ExternalPrice => ({
+      usd: entry?.price ?? 0,
+      change24h: entry?.change ?? 0,
     })
 
-    return result
+    return {
+      lunc: toExternalPrice(
+        data["uluna:classic"] ?? data.uluna_classic ?? data.uluna ?? data.lunc,
+      ),
+      luna2: toExternalPrice(data["uluna:phoenix"] ?? data.luna2 ?? data.luna),
+      ustc: toExternalPrice(data.uusd ?? data.ustc),
+      uusdc: toExternalPrice(data.uusdc ?? data.usdc),
+      uusdt: toExternalPrice(data.uusdt ?? data.usdt),
+      atom: toExternalPrice(data.uatom ?? data.atom),
+      osmo: toExternalPrice(data.uosmo ?? data.osmo),
+      juno: toExternalPrice(data.ujuno ?? data.juno),
+      sei: toExternalPrice(data.usei ?? data.sei),
+      inj: toExternalPrice(data.uinj ?? data.inj),
+      akt: toExternalPrice(data.uakt ?? data.akt),
+      scrt: toExternalPrice(data.uscrt ?? data.scrt),
+      kuji: toExternalPrice(data.ukuji ?? data.kuji),
+      stars: toExternalPrice(data.ustars ?? data.stars),
+      dydx: toExternalPrice(data.udydx ?? data.dydx),
+      ntrn: toExternalPrice(data.untrn ?? data.ntrn),
+      whale: toExternalPrice(data.uwhale ?? data.whale),
+      run: toExternalPrice(data.urun ?? data.run),
+      eth: toExternalPrice(data.weth ?? data.eth),
+      btc: toExternalPrice(data.wbtc ?? data.btc),
+    }
   } catch (error) {
-    console.warn("Failed to load CoinGecko prices", error)
+    console.warn("Failed to load backend CoinMarketCap prices", error)
     return {}
   }
-}
-
-// CoinMarketCap must not be called directly from the frontend due to CORS.
-// Backend recovery can be added separately later.
-const queryCMCPrices = async (): Promise<Record<string, ExternalPrice>> => {
-  return {}
 }
 
 const queryFiatPrice = async (currencyId: string) => {
   if (currencyId === "USD") return 1
 
   try {
-    const { data } = await axios.get<{
-      quotes?: Record<string, number>
-    }>(
-      `https://apilayer.net/api/live?source=USD&currencies=${currencyId}&access_key=${CURRENCY_KEY}`,
+    const response = await axios.get<Record<string, { rate?: number }>>(
+      "http://localhost:3001/api/fiat",
       {
         timeout: 10000,
       },
     )
 
-    return data?.quotes?.[`USD${currencyId}`] ?? 1
+    const data = response?.data
+
+    return data?.[currencyId]?.rate ?? 1
   } catch (error) {
     console.warn(`Failed to load fiat conversion for ${currencyId}`, error)
     return 1
   }
 }
 
+const getUlunaPriceByChain = (
+  chainID: string | undefined,
+  prices: Record<string, ExternalPrice>,
+) => {
+  if (chainID === "columbus-5") {
+    return prices.lunc ?? { usd: 0, change24h: 0 }
+  }
+
+  if (chainID === "phoenix-1") {
+    return prices.luna2 ?? { usd: 0, change24h: 0 }
+  }
+
+  return prices.lunc ?? prices.luna2 ?? { usd: 0, change24h: 0 }
+}
+
 export const useExchangeRates = () => {
   const currency = useCurrency()
-  const isClassic = useNetworkName() === "classic"
+  const chainID = useChainID()
 
   return useQuery(
-    [queryKey.coingecko.exchangeRates, currency, isClassic],
+    [queryKey.coingecko.exchangeRates, currency, chainID],
     async () => {
       const [stationAliases, coinGeckoPrices, cmcPrices, fiatPrice] =
         await Promise.all([
@@ -168,46 +190,75 @@ export const useExchangeRates = () => {
 
       const mergedPrices: Record<string, ExternalPrice> = {
         ...coinGeckoPrices,
+        ...cmcPrices,
       }
 
-      Object.entries(cmcPrices).forEach(([denom, value]) => {
-        const current = mergedPrices[denom]
-        if (!current || !current.usd) {
-          mergedPrices[denom] = value
+      const activeUluna = getUlunaPriceByChain(chainID, mergedPrices)
+
+      const luncPrice = (mergedPrices.lunc?.usd ?? 0) * fiatPrice
+      const luncChange = mergedPrices.lunc?.change24h ?? 0
+
+      const luna2Price = (mergedPrices.luna2?.usd ?? 0) * fiatPrice
+      const luna2Change = mergedPrices.luna2?.change24h ?? 0
+
+      const ustcPrice = (mergedPrices.ustc?.usd ?? 0) * fiatPrice
+      const ustcChange = mergedPrices.ustc?.change24h ?? 0
+
+      const activeUlunaPrice = (activeUluna.usd ?? 0) * fiatPrice
+      const activeUlunaChange = activeUluna.change24h ?? 0
+
+      const priceObject: PriceObject = {
+        uluna: {
+          price: activeUlunaPrice,
+          change: activeUlunaChange,
+        },
+        "uluna:classic": {
+          price: luncPrice,
+          change: luncChange,
+        },
+        "uluna:phoenix": {
+          price: luna2Price,
+          change: luna2Change,
+        },
+        lunc: {
+          price: luncPrice,
+          change: luncChange,
+        },
+        luna2: {
+          price: luna2Price,
+          change: luna2Change,
+        },
+        uusd: {
+          price: ustcPrice,
+          change: ustcChange,
+        },
+        ustc: {
+          price: ustcPrice,
+          change: ustcChange,
+        },
+      }
+
+      if (mergedPrices.uusdc) {
+        priceObject.uusdc = {
+          price: (mergedPrices.uusdc.usd ?? 0) * fiatPrice,
+          change: mergedPrices.uusdc.change24h ?? 0,
+        }
+      }
+
+      if (mergedPrices.uusdt) {
+        priceObject.uusdt = {
+          price: (mergedPrices.uusdt.usd ?? 0) * fiatPrice,
+          change: mergedPrices.uusdt.change24h ?? 0,
+        }
+      }
+
+      Object.entries(AXELAR_TOKENS).forEach(([key, value]) => {
+        if (priceObject[value] && !priceObject[key]) {
+          priceObject[key] = {
+            ...priceObject[value],
+          }
         }
       })
-
-      const priceObject: PriceObject = Object.fromEntries(
-        Object.entries(mergedPrices ?? {}).map(([denom, value]) => {
-          const usd = value?.usd ?? 0
-          const change24h = value?.change24h ?? 0
-
-          if (denom === "uluna" && isClassic) {
-            return [
-              denom,
-              {
-                price: (mergedPrices?.uluna_classic?.usd ?? 0) * fiatPrice,
-                change: mergedPrices?.uluna_classic?.change24h ?? 0,
-              },
-            ]
-          }
-
-          return [
-            AXELAR_TOKENS[denom] ?? denom,
-            {
-              price: usd * fiatPrice,
-              change: change24h,
-            },
-          ]
-        }),
-      )
-
-      if (!priceObject["uluna:classic"] && mergedPrices?.uluna_classic) {
-        priceObject["uluna:classic"] = {
-          price: (mergedPrices.uluna_classic.usd ?? 0) * fiatPrice,
-          change: mergedPrices.uluna_classic.change24h ?? 0,
-        }
-      }
 
       Object.entries(stationAliases ?? {}).forEach(([key, value]) => {
         if (!priceObject[key] && priceObject[value]) {

@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { WithFetching } from "components/feedback"
 import { Read, ReadToken, TokenIcon } from "components/token"
 import { useExchangeRates } from "data/queries/coingecko"
@@ -37,14 +38,40 @@ const AssetChain = (props: Props) => {
 
   const { icon, name } = allNetworks[chain] ?? { name: chain }
 
-  let price
-  if (symbol === "LUNC" && networkName !== "classic") {
-    price = prices?.["uluna:classic"]?.price ?? 0
-  } else {
-    price = prices?.[token]?.price ?? 0
-  }
+  const resolvedPriceEntry = useMemo(() => {
+    if (!prices) return undefined
 
-  // send back is not available if one of the chains the asset went through is not supprted by Station
+    return (
+      (symbol === "LUNC" ? prices["uluna:classic"] : undefined) ??
+      (symbol === "LUNA" ? prices["uluna:phoenix"] : undefined) ??
+      (denom === "uluna" && networkName === "classic"
+        ? prices["uluna:classic"]
+        : undefined) ??
+      (denom === "uluna" && networkName !== "classic"
+        ? prices["uluna:phoenix"]
+        : undefined) ??
+      prices[denom] ??
+      prices[token] ??
+      prices[symbol?.toLowerCase?.() ?? ""] ??
+      prices[`${denom}:classic`] ??
+      prices[`${denom}:phoenix`]
+    )
+  }, [prices, denom, token, symbol, networkName])
+
+  const price = Number(resolvedPriceEntry?.price ?? 0)
+
+  const normalizedBalance = Number(balance ?? "0") / Math.pow(10, decimals ?? 6)
+
+  const walletValue = price * normalizedBalance
+
+  const displayFixed =
+    walletValue > 0 && walletValue < 0.01
+      ? 8
+      : walletValue >= 0.01 && walletValue < 1
+        ? 4
+        : 2
+
+  // send back is not available if one of the chains the asset went through is not supported by Station
   const isSendBackDisabled =
     !!path?.find((chain) => !networks[chain]) ||
     (symbol === "LUNC" && networkName !== "classic")
@@ -53,7 +80,7 @@ const AssetChain = (props: Props) => {
     <article className={styles.chain} key={name}>
       <TokenIcon token={name} icon={icon} size={28} />
       <section className={styles.details}>
-        <h1 className={styles.name}>
+        <div className={styles.name}>
           <h4>
             {name}
             {ibcDenom &&
@@ -64,7 +91,7 @@ const AssetChain = (props: Props) => {
                     <article>
                       <p>
                         {t(
-                          "This asset originates from an unsupported chain and cannot be sent back."
+                          "This asset originates from an unsupported chain and cannot be sent back.",
                         )}
                       </p>
                     </article>
@@ -94,9 +121,11 @@ const AssetChain = (props: Props) => {
                 </IbcSendBack>
               ))}
           </h4>
+
           {path && (
             <p>{path.map((c) => allNetworks[c]?.name ?? c).join(" → ")}</p>
           )}
+
           {devMode && (
             <p>
               <span className={styles.copy__denom}>
@@ -105,20 +134,22 @@ const AssetChain = (props: Props) => {
               </span>
             </p>
           )}
-        </h1>
+        </div>
+
         <h1 className={styles.price}>
           {currency.symbol}{" "}
-          {price ? (
+          {price > 0 ? (
             <Read
+              amount={walletValue}
+              decimals={0}
+              fixed={displayFixed}
               denom=""
-              decimals={decimals}
-              amount={price * parseInt(balance)}
-              fixed={2}
             />
           ) : (
             <span>—</span>
           )}
         </h1>
+
         <h2 className={styles.amount}>
           <WithFetching {...pricesState} height={1}>
             {(progress, wrong) => (

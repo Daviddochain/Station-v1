@@ -1,5 +1,4 @@
 import { useTranslation } from "react-i18next"
-import { flatten, uniq } from "ramda"
 import MonetizationOnOutlinedIcon from "@mui/icons-material/MonetizationOnOutlined"
 import ShortcutOutlinedIcon from "@mui/icons-material/ShortcutOutlined"
 import RestartAltIcon from "@mui/icons-material/RestartAlt"
@@ -8,7 +7,6 @@ import { isDenomTerraNative } from "@terra-money/terra-utils"
 import { has } from "utils/num"
 import { useNetworkName } from "data/wallet"
 import { useIsWalletEmpty } from "data/queries/bank"
-import { useCW20Pairs } from "data/Terra/TerraAssets"
 import { useTFMTokens } from "data/external/tfm"
 import {
   InternalButton,
@@ -90,9 +88,11 @@ const useGetIsSwappableToken = () => {
   return (token: TerraAddress) => {
     if (isDenomTerraNative(token)) return true
     if (networkName === "testnet") return false
-    else {
-      if (!TFMTokens) return false
-      return TFMTokens.find(({ contract_addr }) => token === contract_addr)
-    }
+
+    if (!TFMTokens) return false
+
+    return TFMTokens.find(
+      (item) => "contract_addr" in item && token === item.contract_addr,
+    )
   }
 }

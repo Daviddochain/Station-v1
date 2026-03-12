@@ -41,6 +41,11 @@ import { getChainIDFromAddress } from "utils/bech32"
 const getStakingClient = (lcd: any, chainID?: string) => {
   if (!lcd || !chainID || !lcd.staking) return null
 
+  const hasRequester =
+    !!lcd?.config?.[chainID] && !!lcd?.apiRequesters?.[chainID]
+
+  if (!hasRequester) return null
+
   try {
     return lcd.staking
   } catch {
@@ -102,7 +107,12 @@ export const useInterchainValidators = () => {
 
             return uniqBy(path(["operator_address"]), result)
           } catch (error) {
-            console.warn(`Failed to load validators for ${chainID}`, error)
+            console.warn(`Failed to load validators for ${chainID}`, {
+              error,
+              hasConfig: !!lcd?.config?.[chainID],
+              hasRequester: !!lcd?.apiRequesters?.[chainID],
+              chainLCD,
+            })
             return []
           }
         },
@@ -145,13 +155,22 @@ export const useValidators = (chainID?: string) => {
 
         return uniqBy(path(["operator_address"]), result)
       } catch (error) {
-        console.warn(`Failed to load validators for ${chainID}`, error)
+        console.warn(`Failed to load validators for ${chainID}`, {
+          error,
+          hasConfig: !!lcd?.config?.[chainID],
+          hasRequester: !!lcd?.apiRequesters?.[chainID],
+          chainLCD,
+        })
         return []
       }
     },
     {
       ...RefetchOptions.INFINITY,
-      enabled: !!chainID && !shouldSkipLCD(chainLCD),
+      enabled:
+        !!chainID &&
+        !shouldSkipLCD(chainLCD) &&
+        !!lcd?.config?.[chainID] &&
+        !!lcd?.apiRequesters?.[chainID],
     },
   )
 }

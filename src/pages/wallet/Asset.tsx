@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { WithFetching } from "components/feedback"
 import { Read, ReadToken, TokenIcon } from "components/token"
@@ -32,10 +33,43 @@ const Asset = (props: Props) => {
   const { data: prices, ...pricesState } = useExchangeRates()
   const { route, setRoute } = useWalletRoute()
 
-  const coinPrice = props.price ?? 0
-  const change = props.change ?? 0
+  const resolvedPriceEntry = useMemo(() => {
+    if (!prices) return undefined
 
-  const walletPrice = coinPrice * parseInt(balance ?? "0")
+    return (
+      (symbol === "LUNC" ? prices["uluna:classic"] : undefined) ??
+      (symbol === "LUNA" ? prices["uluna:phoenix"] : undefined) ??
+      prices[denom] ??
+      prices[id] ??
+      prices[token] ??
+      prices[symbol?.toLowerCase?.() ?? ""] ??
+      prices[`${denom}:classic`] ??
+      prices[`${denom}:phoenix`]
+    )
+  }, [prices, denom, id, token, symbol])
+
+  const coinPrice =
+    props.price && props.price > 0
+      ? props.price
+      : (resolvedPriceEntry?.price ?? 0)
+
+  const change =
+    typeof props.change === "number" && props.change !== 0
+      ? props.change
+      : (resolvedPriceEntry?.change ?? 0)
+
+  const normalizedBalance = Number(balance ?? "0") / Math.pow(10, decimals ?? 6)
+
+  const walletPrice = coinPrice * normalizedBalance
+
+  const displayFixed =
+    walletPrice > 0 && walletPrice < 0.01
+      ? 8
+      : walletPrice >= 0.01 && walletPrice < 1
+        ? 4
+        : 2
+
+  const showPrice = coinPrice > 0 && walletPrice > 0
 
   return (
     <article
@@ -65,21 +99,29 @@ const Asset = (props: Props) => {
                 <span className={styles.chain__num}>{chains.length}</span>
               )}
             </h1>
+
             <h1 className={styles.price}>
               {currency.symbol}{" "}
-              {coinPrice ? (
-                <Read amount={walletPrice} decimals={decimals} fixed={2} />
+              {showPrice ? (
+                <Read
+                  amount={walletPrice}
+                  decimals={0}
+                  fixed={displayFixed}
+                  denom=""
+                />
               ) : (
                 <span>—</span>
               )}
             </h1>
           </div>
+
           <div className={styles.bottom__row}>
             <h2
               className={change >= 0 ? styles.change__up : styles.change__down}
             >
               {change >= 0 ? <PriceUp /> : <PriceDown />} {change.toFixed(2)}%
             </h2>
+
             <h2 className={styles.amount}>
               <WithFetching {...combineState(state, pricesState)} height={1}>
                 {(progress, wrong) => (

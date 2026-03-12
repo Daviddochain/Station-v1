@@ -49,7 +49,7 @@ export const useTerraAPI = <T>(path: string, params?: object, fallback?: T) => {
       const { data } = await axios.get(path, { baseURL, params })
       return data
     },
-    { ...RefetchOptions.INFINITY, enabled: !!(baseURL || shouldFallback) }
+    { ...RefetchOptions.INFINITY, enabled: !!(baseURL || shouldFallback) },
   )
 }
 
@@ -67,7 +67,7 @@ export const useGasPrices = () => {
       const { data } = await axios.get<GasPrices>(path, { baseURL })
       return data
     },
-    { ...RefetchOptions.INFINITY, enabled: !!baseURL }
+    { ...RefetchOptions.INFINITY, enabled: !!baseURL },
   )
 }
 
@@ -123,14 +123,14 @@ export const getCalcVotingPowerRate = (validators: Validator[]) => {
   const total = BigNumber.sum(
     ...validators
       .filter(
-        ({ status }) => (status as unknown as string) === "BOND_STATUS_BONDED"
+        ({ status }) => (status as unknown as string) === "BOND_STATUS_BONDED",
       )
-      .map(({ tokens }) => tokens.toString())
+      .map(({ tokens }) => tokens.toString()),
   ).toNumber()
 
   return (address: ValAddress) => {
     const validator = validators.find(
-      ({ operator_address }) => operator_address === address
+      ({ operator_address }) => operator_address === address,
     )
 
     if (!validator) return
@@ -147,14 +147,36 @@ export const calcSelfDelegation = (validator?: TerraValidator) => {
   return self ? Number(self) / Number(tokens) : undefined
 }
 
+const getChainIDForValidatorAddress = (
+  address: ValAddress,
+  networks: Record<string, any>,
+) => {
+  const prefix = ValAddress.getPrefix(address)
+  const matches = Object.values(networks ?? {}).filter(
+    (item) => item?.prefix === prefix,
+  )
+
+  if (!matches.length) return ""
+
+  if (prefix !== "terra") {
+    return matches[0]?.chainID ?? ""
+  }
+
+  const classic = matches.find((item) => item?.chainID === "columbus-5")
+  if (classic) return classic.chainID
+
+  const phoenix = matches.find((item) => item?.chainID === "phoenix-1")
+  if (phoenix) return phoenix.chainID
+
+  return matches[0]?.chainID ?? ""
+}
+
 export const useVotingPowerRate = (address: ValAddress) => {
   const networks = useNetwork()
-  const prefix = ValAddress.getPrefix(address)
-  const chainID = Object.values(networks ?? {}).find(
-    ({ prefix: p }) => p === prefix
-  )?.chainID
+  const chainID = getChainIDForValidatorAddress(address, networks)
 
-  const { data: validators, ...state } = useValidators(chainID ?? "")
+  const { data: validators, ...state } = useValidators(chainID)
+
   const calcRate = useMemo(() => {
     if (!validators) return
     return getCalcVotingPowerRate(validators)

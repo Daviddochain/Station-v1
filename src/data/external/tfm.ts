@@ -27,24 +27,7 @@ export interface TFMSwapResult {
 }
 
 export const queryTFMTokens = async (): Promise<TFMTokenItem[]> => {
-  try {
-    const response = await axios.get("/tokens", {
-      baseURL: TFM_BASE_URL,
-      timeout: 10000,
-    })
-
-    const data = response?.data
-
-    if (!Array.isArray(data)) {
-      console.warn("Invalid TFM tokens response format", data)
-      return []
-    }
-
-    return data as TFMTokenItem[]
-  } catch (error) {
-    console.warn("Failed to load TFM tokens", error)
-    return []
-  }
+  return []
 }
 
 export const useTFMTokens = () => {
@@ -72,6 +55,10 @@ export const queryTFMRoute = async (
       return null
     }
 
+    if (data?.data && typeof data.data === "object") {
+      return data.data as TFMRouteResult
+    }
+
     return data as TFMRouteResult
   } catch (error) {
     console.warn("Failed to load TFM route", error)
@@ -94,6 +81,10 @@ export const queryTFMSwap = async (
     if (!data || typeof data !== "object") {
       console.warn("Invalid TFM swap response format", data)
       return null
+    }
+
+    if (data?.data && typeof data.data === "object") {
+      return data.data as TFMSwapResult
     }
 
     return data as TFMSwapResult
