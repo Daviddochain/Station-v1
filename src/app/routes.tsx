@@ -7,8 +7,10 @@ import { ReactComponent as SwapIcon } from "styles/images/menu/Swap.svg"
 import { ReactComponent as StakeIcon } from "styles/images/menu/Stake.svg"
 import { ReactComponent as GovernanceIcon } from "styles/images/menu/Governance.svg"
 import { ReactComponent as ContractIcon } from "styles/images/menu/Contract.svg"
+import DashboardIcon from "@mui/icons-material/Dashboard"
 
 /* menu */
+import Dashboard from "pages/dashboard/Dashboard"
 import History from "pages/history/History"
 import Stake from "pages/stake/Stake"
 import Governance from "pages/gov/Governance"
@@ -60,6 +62,12 @@ export const useNav = () => {
   const menu = [
     {
       path: "/",
+      element: <Dashboard />,
+      title: t("Dashboard"),
+      icon: <DashboardIcon sx={{ fontSize: 20 }} />,
+    },
+    {
+      path: "/swap",
       element: <SwapTx />,
       title: t("Swap"),
       icon: <SwapIcon {...ICON_SIZE} />,
