@@ -30,9 +30,15 @@ const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
         },
       )
 
+      if (!chains.mainnet) chains.mainnet = {}
+      if (!chains.testnet) chains.testnet = {}
+      if (!chains.classic) chains.classic = {}
+      if (!chains.localterra) chains.localterra = {}
+
       if (chains?.mainnet?.["noble-1"]) {
         delete chains.mainnet["noble-1"]
       }
+
       setNetworks(chains)
     }
 
@@ -41,10 +47,10 @@ const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
 
   const testBase = networks
     ? Object.values({
-        ...networks.mainnet,
-        ...networks.testnet,
-        ...networks.classic,
-        ...networks.localterra,
+        ...(networks.mainnet || {}),
+        ...(networks.testnet || {}),
+        ...(networks.classic || {}),
+        ...(networks.localterra || {}),
       }).map((chain) => {
         const lcd = customLCDs[chain?.chainID] ?? chain.lcd
         return { ...chain, lcd }

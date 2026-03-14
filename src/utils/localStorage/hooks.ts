@@ -31,44 +31,51 @@ export const setLocalSetting = <T>(key: SettingKey, value: T) => {
 
 export const useSavedChain = () => {
   const [savedChain, setSavedChain] = useRecoilState(savedChainState)
+
   const changeSavedChain = useCallback(
     (newChain: string | undefined) => {
       setLocalSetting(SettingKey.Chain, newChain)
       setSavedChain(newChain)
     },
-    [setSavedChain]
+    [setSavedChain],
   )
+
   return { savedChain, changeSavedChain }
 }
 
 export const useSelectedDisplayChain = () => {
   const [selectedDisplayChain, setSelectedChain] = useRecoilState(
-    selectedDisplayChainState
+    selectedDisplayChainState,
   )
+
   const changeSelectedDisplayChain = useCallback(
     (newChain: string | undefined) => {
       setLocalSetting(SettingKey.SelectedDisplayChain, newChain)
       setSelectedChain(newChain)
     },
-    [setSelectedChain]
+    [setSelectedChain],
   )
+
   return { selectedDisplayChain, changeSelectedDisplayChain }
 }
 
 export const useDisplayChains = () => {
   const networkName = useNetworkName()
   const [displayChains, setDisplayChains] = useRecoilState(displayChainsState)
+
   const changeDisplayChains = useCallback(
     (newChains: string[]) => {
       const newDisplayChains = {
-        ...(displayChains || []),
+        ...(displayChains || {}),
         [networkName]: newChains,
       }
+
       setLocalSetting(SettingKey.DisplayChains, newDisplayChains)
       setDisplayChains(newDisplayChains)
     },
-    [setDisplayChains, networkName, displayChains]
+    [setDisplayChains, networkName, displayChains],
   )
+
   return {
     all: displayChains,
     displayChains: displayChains[networkName]?.filter((c) => c !== ""),
@@ -78,18 +85,20 @@ export const useDisplayChains = () => {
 
 export const useCustomLCDs = () => {
   const [customLCDs, setCustomLCDs] = useRecoilState(customLCDState)
+
   function changeCustomLCDs(chainID: string, lcd: string | undefined) {
     const newLCDs = { ...customLCDs, [chainID]: lcd }
     setLocalSetting(SettingKey.CustomLCD, newLCDs)
     setCustomLCDs(newLCDs)
   }
+
   return { customLCDs, changeCustomLCDs }
 }
 
 const toggleSetting = (
   key: SettingKey,
   state: boolean,
-  setState: (state: boolean) => void
+  setState: (state: boolean) => void,
 ) => {
   setLocalSetting(key, !state)
   setState(!state)
@@ -97,6 +106,7 @@ const toggleSetting = (
 
 export const useDevMode = () => {
   const [devMode, setDevMode] = useRecoilState(devModeState)
+
   const changeDevMode = () =>
     toggleSetting(SettingKey.DevMode, devMode, setDevMode)
 
@@ -106,14 +116,16 @@ export const useDevMode = () => {
 export const useTokenFilters = () => {
   const [hideNoWhitelist, setHideNoWhitelist] =
     useRecoilState(hideNoWhitelistState)
+
   const toggleHideNoWhitelist = () =>
     toggleSetting(
       SettingKey.HideNonWhitelistTokens,
       hideNoWhitelist,
-      setHideNoWhitelist
+      setHideNoWhitelist,
     )
 
   const [hideLowBal, setHideLowBal] = useRecoilState(hideLowBalTokenState)
+
   const toggleHideLowBal = () =>
     toggleSetting(SettingKey.HideLowBalTokens, hideLowBal, setHideLowBal)
 
@@ -122,5 +134,28 @@ export const useTokenFilters = () => {
     toggleHideNoWhitelist,
     toggleHideLowBal,
     hideLowBal,
+  }
+}
+
+export const useChainSelector = () => {
+  const { selectedDisplayChain, changeSelectedDisplayChain } =
+    useSelectedDisplayChain()
+
+  const isSelectedChain = useCallback(
+    (chainID: string) => selectedDisplayChain === chainID,
+    [selectedDisplayChain],
+  )
+
+  const selectChain = useCallback(
+    (chainID: string) => {
+      changeSelectedDisplayChain(chainID)
+    },
+    [changeSelectedDisplayChain],
+  )
+
+  return {
+    selectedChain: selectedDisplayChain,
+    selectChain,
+    isSelectedChain,
   }
 }

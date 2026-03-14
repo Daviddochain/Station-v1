@@ -1,12 +1,11 @@
 import { useState } from "react"
+import { useSetRecoilState } from "recoil"
 import { SimpleChainList } from "components/layout"
 import { Popover } from "components/display"
-import styles from "./OtherChainsButton.module.scss"
-import { useSelectedDisplayChain } from "utils/localStorage"
+import { useSelectedDisplayChain, useDisplayChains } from "utils/localStorage"
 import { displayChainPrefsOpen } from "app/sections/Preferences"
-import { useSetRecoilState } from "recoil"
-import { useDisplayChains } from "utils/localStorage"
 import { InterchainNetwork } from "types/network"
+import styles from "./OtherChainsButton.module.scss"
 
 type Props = {
   list: InterchainNetwork[]
@@ -19,15 +18,20 @@ const OtherChainsButton = ({ list, handleSetChain }: Props) => {
   const { changeSelectedDisplayChain } = useSelectedDisplayChain()
   const { displayChains } = useDisplayChains()
 
-  const closePopover = () => setKey((key) => key + 1)
+  const closePopover = () => {
+    setKey((prev) => prev + 1)
+  }
 
   const onClick = (chainID: string) => {
-    if (displayChains?.includes(chainID)) {
+    const isAllowedChain = displayChains?.includes(chainID)
+
+    if (isAllowedChain) {
       changeSelectedDisplayChain(chainID)
       handleSetChain(chainID)
     } else {
       setIsOpen(true)
     }
+
     closePopover()
   }
 

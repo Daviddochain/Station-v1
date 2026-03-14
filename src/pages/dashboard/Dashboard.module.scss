@@ -23,3 +23,20 @@
     grid-template-rows: repeat(1, 1fr);
   }
 }
+
+.bottomRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.bottomRow > * {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .bottomRow {
+    grid-template-columns: 1fr;
+  }
+}

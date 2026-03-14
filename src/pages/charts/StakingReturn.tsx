@@ -13,14 +13,23 @@ import ChartContainer from "./components/ChartContainer"
 import Range from "./components/Range"
 import Filter from "./components/Filter"
 
-const StakingReturn = () => {
+type Props = {
+  chainID: string
+}
+
+const StakingReturn = ({ chainID }: Props) => {
   const { t } = useTranslation()
 
   /* data */
   const [type, setType] = useState<AggregateStakingReturn>(
-    AggregateStakingReturn.ANNUALIZED
+    AggregateStakingReturn.ANNUALIZED,
   )
 
+  // NOTE:
+  // This hook is still TerraAPI-based and does not yet accept a chainID.
+  // We accept the prop now so the dashboard can pass the selected chain
+  // without TypeScript errors, but a true multichain staking return query
+  // will need a different data source later.
   const { data, ...state } = useStakingReturn(type)
 
   /* render */
@@ -49,10 +58,12 @@ const StakingReturn = () => {
 
   const render = () => {
     if (!data) return null
+
     return (
       <Range>
         {(range) => {
           const filled = type === AggregateStakingReturn.DAILY && !range
+
           return (
             <ChartContainer
               type={
@@ -85,7 +96,7 @@ const StakingReturn = () => {
       title={
         <TooltipIcon
           content={t(
-            "The annualized staking yield for Luna is based on gas rewards, minting rewards, and the price of Luna (annualized return = 10 day moving average return * 365)."
+            "The annualized staking yield for Luna is based on gas rewards, minting rewards, and the price of Luna (annualized return = 10 day moving average return * 365).",
           )}
         >
           {t("Staking return")}
@@ -93,6 +104,7 @@ const StakingReturn = () => {
       }
       size="small"
       extra={renderFilter()}
+      data-chainid={chainID}
     >
       {render()}
     </Card>

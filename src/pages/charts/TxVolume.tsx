@@ -1,129 +1,128 @@
-import { useCallback, useState } from "react"
+import { useMemo } from "react"
+import axios from "axios"
+import { useQuery } from "react-query"
 import { useTranslation } from "react-i18next"
-import BigNumber from "bignumber.js"
-import { head, last } from "ramda"
-import { capitalize } from "@mui/material"
-import {
-  isDenomTerraNative,
-  readAmount,
-  readDenom,
-} from "@terra-money/terra-utils"
-import { sortDenoms } from "utils/coin"
-import { useCurrency } from "data/settings/Currency"
-import { Aggregate, useTxVolume } from "data/Terra/TerraAPI"
-import { useActiveDenoms } from "data/queries/coingecko"
-import { Select } from "components/form"
 import { Card } from "components/layout"
 import { TooltipIcon } from "components/display"
-import ChartContainer from "./components/ChartContainer"
-import Filter from "./components/Filter"
-import Range from "./components/Range"
+import DashboardContent from "../dashboard/components/DashboardContent"
 
-const TxVolume = () => {
+type Props = {
+  chainID: string
+}
+
+type VolumeResponse = {
+  chainID: string
+  name: string
+  symbol: string
+  price: number | null
+  volume_24h: number | null
+  market_cap: number | null
+  percent_change_24h: number | null
+  last_updated: string | null
+}
+
+const formatUsdCompact = (value: number | null | undefined) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-"
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+const formatUsdPrice = (value: number | null | undefined) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return "-"
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 6,
+    maximumFractionDigits: 10,
+  }).format(value)
+}
+
+const TxVolume = ({ chainID }: Props) => {
   const { t } = useTranslation()
-  const currency = useCurrency()
 
-  /* data */
-  const [denom, setDenom] = useState("uluna")
-  const [type, setType] = useState<Aggregate>(Aggregate.PERIODIC)
-  const { data: activeDenoms } = useActiveDenoms()
-  const { data, ...state } = useTxVolume(denom, type)
+  const { data, isLoading, isError } = useQuery<VolumeResponse>(
+    ["cmc-current-volume", chainID],
+    async () => {
+      const response = await axios.get(
+        "http://localhost:3001/api/cmc/volume/current",
+        {
+          params: { chainID },
+        },
+      )
 
-  /* render */
-  const renderFilter = () => {
-    if (!activeDenoms) return null
-    return (
-      <Filter>
-        <Select value={denom} onChange={(e) => setDenom(e.target.value)} small>
-          {sortDenoms(activeDenoms, currency.id)
-            .filter(isDenomTerraNative)
-            .map((denom) => (
-              <option value={denom} key={denom}>
-                {readDenom(denom)}
-              </option>
-            ))}
-        </Select>
-
-        <Select
-          value={type}
-          onChange={(e) => setType(e.target.value as Aggregate)}
-          small
-        >
-          {Object.values(Aggregate ?? {}).map((type) => (
-            <option value={type} key={type}>
-              {capitalize(type)}
-            </option>
-          ))}
-        </Select>
-      </Filter>
-    )
-  }
-
-  const calcValue = useCallback(
-    (range: number) => {
-      if (!data) return
-
-      const sliced = data.slice(-1 * range).map(({ value }) => value)
-      const h = head(sliced)
-      const l = last(sliced)
-      const t = sliced[sliced.length - 2]
-
-      if (!(h && l && t)) return
-
-      if (range === 3)
-        return {
-          [Aggregate.CUMULATIVE]: new BigNumber(l).minus(t).toString(),
-          [Aggregate.PERIODIC]: l,
-        }[type]
-
-      return {
-        [Aggregate.CUMULATIVE]: new BigNumber(l).minus(h).toString(),
-        [Aggregate.PERIODIC]: BigNumber.sum(...sliced.slice(1)).toString(),
-      }[type]
+      return response.data
     },
-    [data, type]
+    {
+      enabled: !!chainID,
+      retry: 1,
+    },
   )
 
-  const render = () => {
+  const value = useMemo(() => {
+    return formatUsdCompact(data?.volume_24h)
+  }, [data])
+
+  const footer = useMemo(() => {
+    if (!data) return null
+
+    const change = data.percent_change_24h
+
+    const changeColor =
+      change === null || change === undefined
+        ? "inherit"
+        : change >= 0
+          ? "#4caf50"
+          : "#ff4d4f"
+
     return (
-      <Range initial={3} includeLastDay>
-        {(range) => {
-          const filled = type === Aggregate.PERIODIC && !range
-          return (
-            <ChartContainer
-              type={type === Aggregate.CUMULATIVE || filled ? "area" : "bar"}
-              filled={filled}
-              result={data}
-              range={range}
-              total={calcValue(range)}
-              unit={readDenom(denom)}
-              formatValue={(value) => readAmount(value, { prefix: true })}
-              formatY={(value) =>
-                readAmount(value, { prefix: true, integer: true })
-              }
-            />
-          )
-        }}
-      </Range>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div>
+          <strong>Symbol:</strong> {data.symbol}
+        </div>
+
+        <div>
+          <strong>Price:</strong> {formatUsdPrice(data.price)}
+        </div>
+
+        <div>
+          <strong>24h Change:</strong>{" "}
+          <span style={{ color: changeColor, fontWeight: 600 }}>
+            {change !== null && change !== undefined
+              ? `${change.toFixed(2)}%`
+              : "-"}
+          </span>
+        </div>
+      </div>
     )
-  }
+  }, [data])
 
   return (
     <Card
-      {...state}
+      isLoading={isLoading}
+      error={
+        isError
+          ? new Error("Failed to load current off-chain volume")
+          : undefined
+      }
       title={
         <TooltipIcon
           content={t(
-            "The onchain transaction volume for the selected currency over the selected time period"
+            "Current 24 hour off-chain trading volume from CoinMarketCap.",
           )}
         >
-          {t("Transaction volume")}
+          {t("Off Chain Transaction volume")}
         </TooltipIcon>
       }
-      extra={renderFilter()}
       size="small"
+      data-chainid={chainID}
     >
-      {render()}
+      <DashboardContent value={value} footer={footer} />
     </Card>
   )
 }
