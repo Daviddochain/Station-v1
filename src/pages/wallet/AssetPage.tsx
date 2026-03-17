@@ -76,28 +76,32 @@ const AssetPage = () => {
     ? 0
     : Number(resolvedPriceEntry?.price ?? 0)
 
-  const unknownIBCDenomsData = useIBCBaseDenoms(
-    balances
-      .map(({ denom, chain }) => ({ denom, chainID: chain }))
-      .filter(({ denom, chainID }) => {
-        const data = readNativeDenom(denom, chainID)
-        return denom.startsWith("ibc/") && data.symbol.endsWith("...")
-      }),
-  )
+  const unknownIBCDenomsData =
+    useIBCBaseDenoms(
+      balances
+        .map(({ denom, chain }) => ({ denom, chainID: chain }))
+        .filter(({ denom, chainID }) => {
+          const data = readNativeDenom(denom, chainID)
+          return denom.startsWith("ibc/") && data.symbol.endsWith("...")
+        }),
+    ) ?? []
 
   const unknownIBCDenoms = unknownIBCDenomsData.reduce(
-    (acc, { data }) =>
-      data
+    (acc, item) => {
+      const data = item?.data
+
+      return data
         ? {
             ...acc,
             [[data.ibcDenom, data.chainIDs[data.chainIDs.length - 1]].join(
               "*",
             )]: {
               baseDenom: data.baseDenom,
-              chains: data?.chainIDs,
+              chains: data.chainIDs,
             },
           }
-        : acc,
+        : acc
+    },
     {} as Record<string, { baseDenom: string; chains?: string[] }>,
   )
 

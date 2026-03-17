@@ -16,31 +16,37 @@ import { ChainFeature } from "types/chains"
 
 const ProposalsByStatus = ({ status }: { status: ProposalStatus }) => {
   const { t } = useTranslation()
-  const proposalsResult = useProposals(status)
+
+  const proposalsResult = useProposals(status) ?? []
+
   const proposals = proposalsResult.reduce(
-    (acc, { data }) => (data ? [...acc, ...data] : acc),
-    [] as { prop: ProposalResult; chain: string }[]
+    (acc, item) => {
+      const data = item?.data
+      return data ? [...acc, ...data] : acc
+    },
+    [] as { prop: ProposalResult; chain: string }[],
   )
 
-  const proposalState = combineState(...proposalsResult)
+  const proposalState = combineState(...proposalsResult.filter(Boolean))
   const { label } = useProposalStatusItem(status)
 
   const render = () => {
     if (!proposals) return null
 
-    proposals.sort(
+    const sortedProposals = [...proposals].sort(
       (a, b) =>
         new Date(b.prop.voting_start_time || b.prop.submit_time).getTime() -
-        new Date(a.prop.voting_start_time || a.prop.submit_time).getTime()
+        new Date(a.prop.voting_start_time || a.prop.submit_time).getTime(),
     )
 
     return (
       <>
         <ChainFilter all feature={ChainFeature.GOV}>
           {(chain) => {
-            const filtered = proposals.filter(
-              (p) => !chain || p.chain === chain
+            const filtered = sortedProposals.filter(
+              (p) => !chain || p.chain === chain,
             )
+
             return !filtered.length ? (
               <>
                 <Card>

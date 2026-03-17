@@ -1,4 +1,4 @@
-import { AccAddress } from "@terra-money/feather.js"
+import { AccAddress, ValAddress } from "@terra-money/feather.js"
 import { bech32 } from "bech32"
 
 export function getChainIDFromAddress(
@@ -9,21 +9,28 @@ export function getChainIDFromAddress(
       chainID: string
       prefix: string
     }
-  >
+  >,
 ) {
-  if (!AccAddress.validate(address)) return undefined
-  const addPrefix = AccAddress.getPrefix(address)
+  const isAccAddress = AccAddress.validate(address)
+  const isValAddress = ValAddress.validate(address)
+
+  if (!isAccAddress && !isValAddress) return undefined
+
+  const addPrefix = bech32.decode(address).prefix
+
   return Object.values(chains ?? {}).find(
-    ({ prefix }) => prefix === addPrefix || `${prefix}valoper` === addPrefix
+    ({ prefix }) => prefix === addPrefix || `${prefix}valoper` === addPrefix,
   )?.chainID
 }
 
 export function addressFromWords(words: string, prefix = "terra") {
-  return bech32.encode(prefix, Buffer.from(words, "hex"))
+  return bech32.encode(prefix, bech32.toWords(Buffer.from(words, "hex")))
 }
 
-export function wordsFromAddress(address: AccAddress) {
-  return Buffer.from(bech32.decode(address).words).toString("hex")
+export function wordsFromAddress(address: string) {
+  return Buffer.from(bech32.fromWords(bech32.decode(address).words)).toString(
+    "hex",
+  )
 }
 
 export function randomAddress(prefix = "terra") {

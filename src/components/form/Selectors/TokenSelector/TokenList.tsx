@@ -10,12 +10,16 @@ interface Props {
 }
 
 const TokenList = ({ list, onChange, value, small }: Props) => {
+  console.log("TokenList list", list)
+  console.log("TokenList keys", Object.keys(list ?? {}))
+  console.log("TokenList values", Object.values(list ?? {}))
+
   return (
     <div className={styles.options}>
       <div
         className={classNames(
           styles.options__container,
-          small && styles.options__container__small
+          small && styles.options__container__small,
         )}
       >
         <button
@@ -28,7 +32,8 @@ const TokenList = ({ list, onChange, value, small }: Props) => {
         >
           Show all
         </button>
-        {Object.values(list ?? {}).map(({ symbol, icon, token }) => (
+
+        {Object.values(list ?? {}).map(({ symbol, icon, token, name }) => (
           <button
             className={token === value ? styles.active : ""}
             key={token}
@@ -39,7 +44,10 @@ const TokenList = ({ list, onChange, value, small }: Props) => {
             }}
           >
             <img src={icon} alt={symbol} />
-            {symbol}
+            <span>
+              {symbol}
+              {name ? ` - ${name}` : ""}
+            </span>
           </button>
         ))}
       </div>

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { LinkButton } from "components/general"
 import { Col, Page, Row, Tabs } from "components/layout"
@@ -17,23 +17,26 @@ import { ChainFeature } from "types/chains"
 
 const Stake = () => {
   const { t } = useTranslation()
-  const [chainSelected, setChainSelected] = useState("all")
-
   const { data: chartData, ...state } = useStakeChartData()
 
-  const tabs = [
-    {
-      key: "quick",
-      tab: t("Quick Stake"),
-      children: <QuickStake />,
-      extra: <TooltipIcon content={<QuickStakeTooltip />} placement="bottom" />,
-    },
-    {
-      key: "manual",
-      tab: t("Manual Stake"),
-      children: <Validators />,
-    },
-  ]
+  const tabs = useMemo(
+    () => [
+      {
+        key: "quick",
+        tab: t("Quick Stake"),
+        children: <QuickStake />,
+        extra: (
+          <TooltipIcon content={<QuickStakeTooltip />} placement="bottom" />
+        ),
+      },
+      {
+        key: "manual",
+        tab: t("Manual Stake"),
+        children: <Validators />,
+      },
+    ],
+    [t],
+  )
 
   return (
     <Page
@@ -46,31 +49,29 @@ const Stake = () => {
     >
       <Col>
         {chartData.length ? (
-          <Row>
-            <Col span={2}>
-              <div className={styles.forFetchingBar}>
-                <Fetching {...state}>
-                  <ChainFilter
-                    title={t("Staked funds")}
-                    feature={ChainFeature.STAKING}
-                    all
-                    {...state}
-                  >
-                    {(chain) => {
-                      setChainSelected(chain || "all")
-                      return <StakedDonut chain={chain} />
-                    }}
-                  </ChainFilter>
-                </Fetching>
-              </div>
-            </Col>
-            <Staked chain={chainSelected} />
-          </Row>
+          <ChainFilter
+            title={t("Staked funds")}
+            feature={ChainFeature.STAKING}
+            all
+          >
+            {(chain) => (
+              <Row>
+                <Col span={2}>
+                  <div className={styles.forFetchingBar}>
+                    <Fetching {...state}>
+                      <StakedDonut chain={chain} />
+                    </Fetching>
+                  </div>
+                </Col>
+                <Staked chain={chain || "all"} />
+              </Row>
+            )}
+          </ChainFilter>
         ) : (
           <DelegationsPromote horizontal />
         )}
 
-        <Tabs tabs={tabs} type="page" state />
+        <Tabs tabs={tabs} type="page" />
       </Col>
     </Page>
   )

@@ -28,6 +28,8 @@ import shuffle from "utils/shuffle"
 import { getIsBonded } from "pages/stake/ValidatorsList"
 import { useNetwork, useNetworkWithFeature } from "data/wallet"
 import { ChainFeature } from "types/chains"
+import axios from "axios"
+import { useNetworks } from "app/InitNetworks"
 
 import { AllianceDelegationResponse } from "@terra-money/feather.js/dist/client/lcd/api/AllianceAPI"
 import {
@@ -53,7 +55,10 @@ const getStakingClient = (lcd: any, chainID?: string) => {
   }
 }
 
-const BROKEN_LCD_HOSTS = new Set(["lcd-terraclassic.tfl.foundation"])
+const BROKEN_LCD_HOSTS = new Set([
+  "lcd-terraclassic.tfl.foundation",
+  "lcd-terra.tfl.foundation",
+])
 
 const parseURL = (value?: string) => {
   if (!value) return null
@@ -71,9 +76,57 @@ const shouldSkipLCD = (lcd?: string) => {
   return BROKEN_LCD_HOSTS.has(parsed.hostname)
 }
 
+const loadAllValidatorsForChain = async (chainLCD: string) => {
+  type ValidatorsApiResponse = {
+    validators?: Validator[]
+    pagination?: {
+      next_key?: string | null
+    }
+  }
+
+  const result: Validator[] = []
+  let nextKey: string | null = null
+
+  console.log("loadAllValidatorsForChain START", { chainLCD })
+
+  while (true) {
+    const response: { data: ValidatorsApiResponse } = await axios.get(
+      `${chainLCD}/cosmos/staking/v1beta1/validators`,
+      {
+        params: {
+          status: "BOND_STATUS_BONDED",
+          "pagination.limit": 200,
+          ...(nextKey ? { "pagination.key": nextKey } : {}),
+        },
+      },
+    )
+
+    const validators: Validator[] = response.data?.validators ?? []
+    const pagination: ValidatorsApiResponse["pagination"] =
+      response.data?.pagination ?? {}
+
+    console.log("loadAllValidatorsForChain PAGE", {
+      chainLCD,
+      validatorsCount: validators.length,
+      nextKey: pagination?.next_key ?? null,
+    })
+
+    result.push(...validators)
+    nextKey = pagination?.next_key ?? null
+
+    if (!nextKey) break
+  }
+
+  console.log("loadAllValidatorsForChain DONE", {
+    chainLCD,
+    total: result.length,
+  })
+
+  return uniqBy(path(["operator_address"]), result)
+}
+
 export const useInterchainValidators = () => {
   const addresses = useInterchainAddressesWithFeature(ChainFeature.STAKING)
-  const lcd = useInterchainLCDClient()
   const networks = useNetwork()
 
   return useQueries(
@@ -81,36 +134,15 @@ export const useInterchainValidators = () => {
       return {
         queryKey: [queryKey.interchain.staking.validators, addresses, chainID],
         queryFn: async () => {
-          const staking = getStakingClient(lcd, chainID)
           const chainLCD = networks?.[chainID]?.lcd
 
-          if (!staking || shouldSkipLCD(chainLCD)) return []
-
-          const result: Validator[] = []
-          let key: string | null = ""
+          if (!chainLCD || shouldSkipLCD(chainLCD)) return []
 
           try {
-            do {
-              const response = await staking.validators(chainID, {
-                "pagination.limit": "100",
-                "pagination.key": key,
-              })
-
-              const list = (response?.[0] ?? []) as Validator[]
-              const pageInfo = response?.[1] as
-                | { next_key?: string | null }
-                | undefined
-
-              result.push(...list)
-              key = pageInfo?.next_key ?? null
-            } while (key)
-
-            return uniqBy(path(["operator_address"]), result)
+            return await loadAllValidatorsForChain(chainLCD)
           } catch (error) {
             console.warn(`Failed to load validators for ${chainID}`, {
               error,
-              hasConfig: !!lcd?.config?.[chainID],
-              hasRequester: !!lcd?.apiRequesters?.[chainID],
               chainLCD,
             })
             return []
@@ -124,53 +156,44 @@ export const useInterchainValidators = () => {
 }
 
 export const useValidators = (chainID?: string) => {
-  const lcd = useInterchainLCDClient()
-  const networks = useNetwork()
-  const chainLCD = chainID ? networks?.[chainID]?.lcd : undefined
+  const { networks } = useNetworks()
+
+  const flatNetworks = {
+    ...(networks?.mainnet || {}),
+    ...(networks?.classic || {}),
+    ...(networks?.testnet || {}),
+    ...(networks?.localterra || {}),
+  }
+
+  const chainLCD = chainID ? flatNetworks?.[chainID]?.lcd : undefined
 
   return useQuery(
     [queryKey.staking.validators, chainID],
     async () => {
-      const staking = getStakingClient(lcd, chainID)
-      if (!staking || !chainID || shouldSkipLCD(chainLCD)) return []
+      console.log("useValidators START", { chainID, chainLCD })
 
-      const result: Validator[] = []
-      let key: string | null = ""
+      if (!chainID || !chainLCD || shouldSkipLCD(chainLCD)) {
+        console.log("useValidators SKIPPED", { chainID, chainLCD })
+        return []
+      }
 
       try {
-        do {
-          const response = await staking.validators(chainID, {
-            "pagination.limit": "100",
-            "pagination.key": key,
-          })
-
-          const list = (response?.[0] ?? []) as Validator[]
-          const pageInfo = response?.[1] as
-            | { next_key?: string | null }
-            | undefined
-
-          result.push(...list)
-          key = pageInfo?.next_key ?? null
-        } while (key)
-
-        return uniqBy(path(["operator_address"]), result)
-      } catch (error) {
-        console.warn(`Failed to load validators for ${chainID}`, {
-          error,
-          hasConfig: !!lcd?.config?.[chainID],
-          hasRequester: !!lcd?.apiRequesters?.[chainID],
+        const data = await loadAllValidatorsForChain(chainLCD)
+        console.log("useValidators SUCCESS", {
+          chainID,
           chainLCD,
+          count: data.length,
+          first: data[0],
         })
+        return data
+      } catch (error) {
+        console.warn("useValidators FAILED", { chainID, chainLCD, error })
         return []
       }
     },
     {
       ...RefetchOptions.INFINITY,
-      enabled:
-        !!chainID &&
-        !shouldSkipLCD(chainLCD) &&
-        !!lcd?.config?.[chainID] &&
-        !!lcd?.apiRequesters?.[chainID],
+      enabled: !!chainID && !!chainLCD && !shouldSkipLCD(chainLCD),
     },
   )
 }
@@ -226,57 +249,152 @@ export const useValidator = (operatorAddress: ValAddress) => {
   const chainLCD = chainID ? networks?.[chainID]?.lcd : undefined
 
   return useQuery(
-    [queryKey.staking.validator, operatorAddress],
+    [queryKey.staking.validator, operatorAddress, chainID],
     async () => {
-      if (!chainID || !lcd?.staking || shouldSkipLCD(chainLCD)) return undefined
+      const staking = getStakingClient(lcd, chainID)
+
+      if (!chainID || !staking || !chainLCD || shouldSkipLCD(chainLCD)) {
+        return undefined
+      }
 
       try {
         return await lcd.staking.validator(operatorAddress)
       } catch (error) {
-        console.warn(`Failed to load validator ${operatorAddress}`, error)
-        return undefined
+        console.warn(
+          `Direct validator lookup failed for ${operatorAddress} on ${chainID}, falling back to validators list`,
+          error,
+        )
+
+        try {
+          const validators = await loadAllValidatorsForChain(chainLCD)
+          return validators.find(
+            ({ operator_address }) => operator_address === operatorAddress,
+          )
+        } catch (fallbackError) {
+          console.warn(`Failed to load validator ${operatorAddress}`, {
+            fallbackError,
+            chainID,
+            chainLCD,
+          })
+          return undefined
+        }
       }
     },
     {
       ...RefetchOptions.INFINITY,
-      enabled: !!chainID && !shouldSkipLCD(chainLCD),
+      enabled:
+        !!operatorAddress &&
+        !!chainID &&
+        !!chainLCD &&
+        !shouldSkipLCD(chainLCD) &&
+        !!lcd?.config?.[chainID] &&
+        !!lcd?.apiRequesters?.[chainID],
     },
   )
 }
 
 export const useStakingParams = (chainID: string) => {
-  const lcd = useInterchainLCDClient()
+  const { networks } = useNetworks()
+
+  const flatNetworks = {
+    ...(networks?.mainnet || {}),
+    ...(networks?.classic || {}),
+    ...(networks?.testnet || {}),
+    ...(networks?.localterra || {}),
+  }
+
+  const chainLCD = flatNetworks?.[chainID]?.lcd
 
   return useQuery(
     [queryKey.staking.params, chainID],
     async () => {
-      if (!chainID || !lcd?.staking) return undefined
+      if (!chainID || !chainLCD || shouldSkipLCD(chainLCD)) return undefined
 
       try {
-        return await lcd.staking.parameters(chainID)
+        const response: {
+          data?: {
+            params?: {
+              unbonding_time?: string
+            }
+          }
+        } = await axios.get(`${chainLCD}/cosmos/staking/v1beta1/params`)
+
+        const unbondingTimeSeconds = Number(
+          response?.data?.params?.unbonding_time?.replace?.("s", "") ?? 0,
+        )
+
+        return {
+          chainID,
+          unbonding_time: unbondingTimeSeconds,
+        }
       } catch (error) {
         console.warn(`Failed to load staking params for ${chainID}`, error)
         return undefined
       }
     },
-    { ...RefetchOptions.INFINITY, enabled: !!chainID },
+    {
+      ...RefetchOptions.INFINITY,
+      enabled: !!chainID && !!chainLCD && !shouldSkipLCD(chainLCD),
+    },
   )
 }
 
 export const useAllStakingParams = () => {
-  const lcd = useInterchainLCDClient()
-  const network = useNetworkWithFeature(ChainFeature.STAKING)
+  const { networks } = useNetworks()
+
+  const flatNetworks = {
+    ...(networks?.mainnet || {}),
+    ...(networks?.classic || {}),
+    ...(networks?.testnet || {}),
+    ...(networks?.localterra || {}),
+  }
+
+  const stakingNetworks = Object.values(flatNetworks).filter((network: any) => {
+    const chainID = network?.chainID
+    const stakingEnabled =
+      !Array.isArray(network?.disabledModules) ||
+      !network.disabledModules.includes(ChainFeature.STAKING)
+
+    return (
+      stakingEnabled && (chainID === "phoenix-1" || chainID === "columbus-5")
+    )
+  })
 
   return useQueries(
-    Object.values(network ?? {}).map(({ chainID }) => {
+    stakingNetworks.map((network: any) => {
+      const chainID = network?.chainID
+      const chainLCD = network?.lcd
+
       return {
         queryKey: [queryKey.staking.params, chainID],
         queryFn: async () => {
-          if (!lcd?.staking || !chainID) return { chainID }
+          if (!chainID || !chainLCD || shouldSkipLCD(chainLCD)) {
+            return { chainID }
+          }
 
           try {
-            const params = await lcd.staking.parameters(chainID)
-            return { ...params, chainID }
+            const response: {
+              data?: {
+                params?: {
+                  unbonding_time?: string
+                }
+              }
+            } = await axios.get(`${chainLCD}/cosmos/staking/v1beta1/params`)
+
+            const unbondingTimeSeconds = Number(
+              response?.data?.params?.unbonding_time?.replace?.("s", "") ?? 0,
+            )
+
+            console.log("useAllStakingParams SUCCESS", {
+              chainID,
+              chainLCD,
+              unbondingTimeSeconds,
+            })
+
+            return {
+              chainID,
+              unbonding_time: unbondingTimeSeconds,
+            }
           } catch (error) {
             console.warn(`Failed to load staking params for ${chainID}`, error)
             return { chainID }
@@ -333,7 +451,12 @@ export const useDelegations = (chainID: string, disabled?: boolean) => {
     },
     {
       ...RefetchOptions.DEFAULT,
-      enabled: !!chainID && !disabled && !shouldSkipLCD(chainLCD),
+      enabled:
+        !!chainID &&
+        !disabled &&
+        !shouldSkipLCD(chainLCD) &&
+        !!lcd?.config?.[chainID] &&
+        !!lcd?.apiRequesters?.[chainID],
     },
   )
 }
@@ -341,16 +464,21 @@ export const useDelegations = (chainID: string, disabled?: boolean) => {
 export const useDelegation = (validatorAddress: ValAddress) => {
   const addresses = useInterchainAddressesWithFeature(ChainFeature.STAKING)
   const lcd = useInterchainLCDClient()
+  const networks = useNetwork()
+  const chainID = getChainIDFromAddress(validatorAddress, networks)
 
   return useQuery(
-    [queryKey.staking.delegation, addresses, validatorAddress],
+    [queryKey.staking.delegation, addresses, validatorAddress, chainID],
     async () => {
-      if (!addresses || !lcd?.staking) return undefined
+      if (!addresses || !lcd?.staking || !chainID) return undefined
 
-      const prefix = ValAddress.getPrefix(validatorAddress)
-      const address = Object.values(addresses ?? {}).find(
-        (a) => AccAddress.getPrefix(a as string) === prefix,
-      )
+      const address =
+        addresses?.[chainID] ??
+        Object.values(addresses ?? {}).find(
+          (a) =>
+            AccAddress.getPrefix(a as string) ===
+            ValAddress.getPrefix(validatorAddress),
+        )
 
       if (!address) return undefined
 
@@ -360,7 +488,7 @@ export const useDelegation = (validatorAddress: ValAddress) => {
         return undefined
       }
     },
-    { ...RefetchOptions.DEFAULT, enabled: !!validatorAddress },
+    { ...RefetchOptions.DEFAULT, enabled: !!validatorAddress && !!chainID },
   )
 }
 
@@ -422,7 +550,11 @@ export const useUnbondings = (chainID: string) => {
     },
     {
       ...RefetchOptions.DEFAULT,
-      enabled: !!chainID && !shouldSkipLCD(chainLCD),
+      enabled:
+        !!chainID &&
+        !shouldSkipLCD(chainLCD) &&
+        !!lcd?.config?.[chainID] &&
+        !!lcd?.apiRequesters?.[chainID],
     },
   )
 }
@@ -435,10 +567,11 @@ export const useStakingPool = (chainID: string) => {
   return useQuery(
     [queryKey.staking.pool, chainID],
     async () => {
-      if (!chainID || !lcd?.staking || shouldSkipLCD(chainLCD)) return undefined
+      const staking = getStakingClient(lcd, chainID)
+      if (!chainID || !staking || shouldSkipLCD(chainLCD)) return undefined
 
       try {
-        return await lcd.staking.pool(chainID)
+        return await staking.pool(chainID)
       } catch (error) {
         console.warn(`Failed to load staking pool for ${chainID}`, error)
         return undefined
@@ -446,7 +579,11 @@ export const useStakingPool = (chainID: string) => {
     },
     {
       ...RefetchOptions.INFINITY,
-      enabled: !!chainID && !shouldSkipLCD(chainLCD),
+      enabled:
+        !!chainID &&
+        !shouldSkipLCD(chainLCD) &&
+        !!lcd?.config?.[chainID] &&
+        !!lcd?.apiRequesters?.[chainID],
     },
   )
 }
@@ -512,21 +649,20 @@ export const useStakeChartData = (chain?: string) => {
 
   const delegationsData = useInterchainDelegations()
   const delegations: Delegation[] = delegationsData
-    .filter(({ data }) => !chain || chain === data?.chainID)
-    .reduce(
-      (acc, { data }) => (data ? [...(data.delegation ?? []), ...acc] : acc),
-      [] as Delegation[],
-    )
+    .filter((item) => !chain || chain === item?.data?.chainID)
+    .reduce((acc, item) => {
+      const data = item?.data
+      return data ? [...(data.delegation ?? []), ...acc] : acc
+    }, [] as Delegation[])
 
   const allianceDelegationsData = useInterchainAllianceDelegations()
   let allianceDelegations = allianceDelegationsData
     .concat()
-    .filter(({ data }) => !chain || chain === data?.chainID)
-    .reduce(
-      (acc, { data }) =>
-        data?.delegations ? [...data.delegations, ...acc] : acc,
-      [] as AllianceDelegation[],
-    )
+    .filter((item) => !chain || chain === item?.data?.chainID)
+    .reduce((acc, item) => {
+      const data = item?.data
+      return data?.delegations ? [...data.delegations, ...acc] : acc
+    }, [] as AllianceDelegation[])
 
   allianceDelegations = allianceDelegations.concat(
     getAllianceDelegations(filteredHubDelegations),

@@ -3,8 +3,8 @@ import {
   CoinBalance,
   useInitialBankBalance,
   useInitialTokenBalance,
+  BankBalanceProvider,
 } from "data/queries/bank"
-import { BankBalanceProvider } from "data/queries/bank"
 import { useNetworkName } from "data/wallet"
 import { combineState } from "data/query"
 import { WithFetching } from "components/feedback"
@@ -12,41 +12,49 @@ import { useCustomTokensNative } from "data/settings/CustomTokens"
 import { useWhitelist } from "data/queries/chains"
 
 const InitBankBalance = ({ children }: PropsWithChildren<{}>) => {
-  const balances = useInitialBankBalance()
-  const tokenBalancesQuery = useInitialTokenBalance()
+  const balances = useInitialBankBalance() ?? []
+  const tokenBalancesQuery = useInitialTokenBalance() ?? []
   const native = useCustomTokensNative()
   const { whitelist } = useWhitelist()
-
   const networkName = useNetworkName()
 
-  const state = combineState(...balances, ...tokenBalancesQuery)
-  const bankBalance = balances.reduce(
-    (acc, { data }) => (data ? [...acc, ...data] : acc),
-    [] as CoinBalance[]
+  const state = combineState(
+    ...balances.filter(Boolean),
+    ...tokenBalancesQuery.filter(Boolean),
   )
-  const tokenBalance: CoinBalance[] = tokenBalancesQuery.reduce(
-    (acc, { data }) => (data ? [...acc, data] : acc),
-    [] as CoinBalance[]
-  )
+
+  const bankBalance = balances.reduce((acc, item) => {
+    const data = item?.data
+    return data ? [...acc, ...data] : acc
+  }, [] as CoinBalance[])
+
+  const tokenBalance = tokenBalancesQuery.reduce((acc, item) => {
+    const data = item?.data
+    return data ? [...acc, data] : acc
+  }, [] as CoinBalance[])
+
+  const networkWhitelist =
+    (networkName && whitelist?.[networkName] ? whitelist[networkName] : {}) ??
+    {}
 
   native.list.forEach(({ id }) => {
     const [chain, ...denomData] = id.split(":")
     const denom = denomData.join(":")
-    if (
-      !bankBalance.find(
-        (balance) => balance.denom === denom && balance.chain === chain
-      )
-    ) {
-      const token = whitelist[networkName][id]
 
-      if (!token || !token.chains || token.chains.length === 0) return
+    const exists = bankBalance.find(
+      (balance) => balance.denom === denom && balance.chain === chain,
+    )
 
-      bankBalance.push({
-        denom,
-        amount: "0",
-        chain,
-      })
-    }
+    if (exists) return
+
+    const token = networkWhitelist?.[id]
+    if (!token?.chains?.length) return
+
+    bankBalance.push({
+      denom,
+      amount: "0",
+      chain,
+    })
   })
 
   return (

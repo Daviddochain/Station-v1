@@ -17,33 +17,59 @@ export const [useNetworks, NetworksProvider] = createContext<{
   networksLoading: boolean
 }>("useNetworks")
 
+const emptyNetworks: InterchainNetworks = {
+  mainnet: {},
+  testnet: {},
+  classic: {},
+  localterra: {},
+}
+
 const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
   const [networks, setNetworks] = useState<InterchainNetworks>()
   const { customLCDs } = useCustomLCDs()
 
   useEffect(() => {
     const fetchChains = async () => {
-      const { data: chains } = await axios.get<InterchainNetworks>(
-        "/chains.json",
-        {
+      try {
+        const response = await axios.get<InterchainNetworks>("/chains.json", {
           baseURL: STATION_ASSETS,
-        },
-      )
+        })
 
-      if (!chains.mainnet) chains.mainnet = {}
-      if (!chains.testnet) chains.testnet = {}
-      if (!chains.classic) chains.classic = {}
-      if (!chains.localterra) chains.localterra = {}
+        const chains = response?.data
 
-      if (chains?.mainnet?.["noble-1"]) {
-        delete chains.mainnet["noble-1"]
+        if (!chains) {
+          console.error("chains.json returned no data", {
+            baseURL: STATION_ASSETS,
+          })
+          setNetworks(emptyNetworks)
+          return
+        }
+
+        if (!chains.mainnet) chains.mainnet = {}
+        if (!chains.testnet) chains.testnet = {}
+        if (!chains.classic) chains.classic = {}
+        if (!chains.localterra) chains.localterra = {}
+
+        if (chains?.mainnet?.["noble-1"]) {
+          delete chains.mainnet["noble-1"]
+        }
+
+        console.log("Loaded chains.json", chains)
+        console.log("Has phoenix-1", chains?.mainnet?.["phoenix-1"])
+
+        setNetworks(chains)
+      } catch (error) {
+        console.error("Failed to fetch chains.json", {
+          error,
+          baseURL: STATION_ASSETS,
+          url: "/chains.json",
+        })
+        setNetworks(emptyNetworks)
       }
-
-      setNetworks(chains)
     }
 
     fetchChains()
-  }, [])
+  }, [customLCDs])
 
   const testBase = networks
     ? Object.values({
@@ -57,12 +83,12 @@ const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
       })
     : []
 
-  const validationResult = useValidNetworks(testBase)
+  const validationResult = useValidNetworks(testBase) ?? []
 
-  const validNetworks = validationResult.reduce(
-    (acc, { data }) => (data ? [...acc, data] : acc),
-    [] as string[],
-  )
+  const validNetworks = validationResult.reduce((acc, item) => {
+    const data = item?.data
+    return data ? [...acc, data] : acc
+  }, [] as string[])
 
   const validationState = combineState(...validationResult)
 

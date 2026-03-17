@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { readPercent } from "@terra-money/terra-utils"
@@ -30,18 +30,36 @@ const ValidatorsList = ({
 
   const { data: validators, ...validatorsState } = useValidators(chainID)
 
+  useEffect(() => {
+    console.log("ValidatorsList chainID:", chainID)
+    console.log("ValidatorsList validators raw:", validators)
+    console.log("ValidatorsList validatorsState:", validatorsState)
+  }, [chainID, validators, validatorsState])
+
   const state = combineState(validatorsState)
 
   const activeValidators = useMemo(() => {
-    if (!validators) return null
+    if (!validators || !Array.isArray(validators)) return []
+
     const priorityVals = getPriorityVals(validators)
     const calcRate = getCalcVotingPowerRate(validators)
 
-    return validators
-      .filter(({ status }) => keyword || !getIsUnbonded(status))
+    const filtered = validators
+      .filter((validator) => {
+        if (keyword) return true
+
+        const status = validator?.status
+
+        if (status === undefined || status === null) {
+          return true
+        }
+
+        return !getIsUnbonded(status)
+      })
       .map((validator) => {
         const { operator_address } = validator
         const voting_power_rate = calcRate(operator_address)
+
         return {
           ...validator,
           rank:
@@ -50,9 +68,20 @@ const ValidatorsList = ({
         }
       })
       .sort((a, b) => b.rank - a.rank)
+
+    console.log("ValidatorsList activeValidators:", filtered)
+    return filtered
   }, [validators, keyword])
 
-  if (!activeValidators) return null
+  if (!activeValidators.length) {
+    return (
+      <Page {...state} invisible>
+        <section className={styles.table}>
+          <div style={{ padding: "16px 20px" }}>{t("No validators found")}</div>
+        </section>
+      </Page>
+    )
+  }
 
   return (
     <Page {...state} invisible>
@@ -69,6 +98,7 @@ const ValidatorsList = ({
           sorter={(a, b) => {
             const jailed = Number(a.jailed) - Number(b.jailed)
             if (jailed) return jailed
+
             return (
               Number(getIsUnbonded(a.status)) - Number(getIsUnbonded(b.status))
             )
@@ -114,7 +144,7 @@ const ValidatorsList = ({
               defaultSortOrder: "desc",
               sorter: (
                 { voting_power_rate: a = 0 },
-                { voting_power_rate: b = 0 }
+                { voting_power_rate: b = 0 },
               ) => a - b,
               render: (value = 0) => readPercent(value),
               align: "right",
@@ -125,7 +155,7 @@ const ValidatorsList = ({
               defaultSortOrder: "asc",
               sorter: (
                 { commission: { commission_rates: a } },
-                { commission: { commission_rates: b } }
+                { commission: { commission_rates: b } },
               ) => a.rate.toNumber() - b.rate.toNumber(),
               render: ({ rate }: Validator.CommissionRates) =>
                 readPercent(rate.toString(), { fixed: 2 }),
@@ -136,13 +166,11 @@ const ValidatorsList = ({
               dataIndex: [],
               render: (_, validator) => {
                 const { operator_address } = validator
+                const encodedDenom = denom.replaceAll("/", "=")
 
                 return (
                   <LinkButton
-                    to={`/stake/${operator_address}/${denom.replaceAll(
-                      "/",
-                      "="
-                    )}#Delegate`}
+                    to={`/stake/${operator_address}/${encodedDenom}#Delegate`}
                     color="primary"
                     size="small"
                   >

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next"
-import { AccAddress, Dec } from "@terra-money/feather.js"
+import { AccAddress, Dec, UnbondingDelegation } from "@terra-money/feather.js"
 import { getMaxHeightStyle } from "utils/style"
 import { combineState } from "data/query"
 import { useExchangeRates } from "data/queries/coingecko"
@@ -13,7 +13,6 @@ import { Table } from "components/layout"
 import { ReadToken } from "components/token"
 import { DateTimeRenderer, TooltipIcon } from "components/display"
 import StakedCard from "../components/StakedCard"
-import { UnbondingDelegation } from "@terra-money/feather.js"
 import { useNetworkWithFeature } from "data/wallet"
 import { useNativeDenoms } from "data/token"
 import { getDenomFromAddress } from "utils/coin"
@@ -26,12 +25,17 @@ const Unbondings = () => {
   const readNativeDenom = useNativeDenoms()
   const { data: prices, ...pricesState } = useExchangeRates()
 
-  const interchainUnbondings = useInterchainUnbondings()
-  const unbondings = interchainUnbondings.reduce(
-    (acc, { data }) => (data ? [...data, ...acc] : acc),
-    [] as UnbondingDelegation[],
+  const interchainUnbondings = useInterchainUnbondings() ?? []
+
+  const unbondings = interchainUnbondings.reduce((acc, item) => {
+    const data = item?.data
+    return data ? [...data, ...acc] : acc
+  }, [] as UnbondingDelegation[])
+
+  const state = combineState(
+    pricesState,
+    ...interchainUnbondings.filter(Boolean),
   )
-  const state = combineState(pricesState, ...interchainUnbondings)
 
   const title = t("Undelegations")
 
@@ -41,13 +45,14 @@ const Unbondings = () => {
     const total = unbondings.reduce((acc, unbonding) => {
       let balance = 0
 
-      unbonding.entries.forEach(
-        (entry: UnbondingDelegation.Entry) =>
-          (balance += entry.balance.toNumber()),
-      )
+      unbonding.entries.forEach((entry: UnbondingDelegation.Entry) => {
+        balance += entry.balance.toNumber()
+      })
 
       const denom = getDenomFromAddress(networks, unbonding.delegator_address)
-      const { token, decimals } = readNativeDenom(denom)
+      const native = readNativeDenom(denom)
+      const token = native?.token ?? ""
+      const decimals = native?.decimals ?? 6
 
       return (
         acc + (balance * (prices[token]?.price || 0)) / Math.pow(10, decimals)

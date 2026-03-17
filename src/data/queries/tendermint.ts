@@ -13,6 +13,11 @@ interface LCDValidationResult {
 
 const isBrowser = typeof window !== "undefined"
 
+const normalizeLCD = (lcd?: string) => {
+  if (!lcd) return ""
+  return lcd.replace(/\/+$/, "")
+}
+
 const parseURL = (value?: string) => {
   if (!value) return null
 
@@ -32,7 +37,8 @@ const isLocalHost = (hostname: string) => {
 }
 
 const canBrowserValidateLCD = (lcd?: string) => {
-  const target = parseURL(lcd)
+  const normalized = normalizeLCD(lcd)
+  const target = parseURL(normalized)
 
   if (!target) return false
   if (!isBrowser) return true
@@ -90,23 +96,25 @@ export const useValidateLCD = (lcd?: string) => {
   return useQuery<LCDValidationResult>(
     [queryKey.tendermint.nodeInfo, "custom-lcd", lcd],
     async () => {
-      if (!lcd) {
+      const normalizedLCD = normalizeLCD(lcd)
+
+      if (!normalizedLCD) {
         return {
           valid: false,
           url: "",
         }
       }
 
-      if (!canBrowserValidateLCD(lcd)) {
+      if (!canBrowserValidateLCD(normalizedLCD)) {
         return {
           valid: true,
-          url: lcd,
+          url: normalizedLCD,
         }
       }
 
       try {
         const response = await fetch(
-          `${lcd}/cosmos/base/tendermint/v1beta1/node_info`,
+          `${normalizedLCD}/cosmos/base/tendermint/v1beta1/node_info`,
           {
             method: "GET",
           },
@@ -114,24 +122,24 @@ export const useValidateLCD = (lcd?: string) => {
 
         return {
           valid: response.ok,
-          url: lcd,
+          url: normalizedLCD,
         }
       } catch (error: unknown) {
         if (error instanceof Error) {
           console.warn("Custom LCD validation failed:", {
-            lcd,
+            lcd: normalizedLCD,
             message: error.message,
           })
         } else {
           console.warn("Custom LCD validation failed:", {
-            lcd,
+            lcd: normalizedLCD,
             message: String(error),
           })
         }
 
         return {
           valid: false,
-          url: lcd,
+          url: normalizedLCD,
         }
       }
     },

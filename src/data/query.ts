@@ -12,13 +12,19 @@ export const Pagination = {
 }
 
 /* helpers */
-export const combineState = (...results: QueryState[]) => ({
-  isIdle: results.some((result) => result.isIdle),
-  isLoading: results.some((result) => result.isLoading),
-  isFetching: results.some((result) => result.isFetching),
-  isSuccess: results.every((result) => result.isSuccess),
-  error: results.find((result) => result.error)?.error,
-})
+export const combineState = (...results: QueryState[]) => {
+  const safeResults = results.filter(Boolean)
+
+  return {
+    isIdle: safeResults.some((result) => result?.isIdle),
+    isLoading: safeResults.some((result) => result?.isLoading),
+    isFetching: safeResults.some((result) => result?.isFetching),
+    isSuccess:
+      safeResults.length > 0 &&
+      safeResults.every((result) => result?.isSuccess),
+    error: safeResults.find((result) => result?.error)?.error,
+  }
+}
 
 /* queryKey */
 const mirror = <T extends Object>(obj: T, parentKey?: string): T =>

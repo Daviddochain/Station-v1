@@ -25,29 +25,33 @@ const Delegations = () => {
   const { data: prices, ...pricesState } = useExchangeRates()
   const allianceHub = useAllianceHub()
 
-  const interchainDelegations = useInterchainDelegations()
+  const interchainDelegations = useInterchainDelegations() ?? []
   const allianceHubDelegationsData = allianceHub.useDelegations()
-  const allianceDelegationsData = useInterchainAllianceDelegations()
+  const allianceDelegationsData = useInterchainAllianceDelegations() ?? []
 
   const state = combineState(
     pricesState,
-    ...interchainDelegations,
-    ...allianceDelegationsData,
-    allianceHubDelegationsData
+    ...interchainDelegations.filter(Boolean),
+    ...allianceDelegationsData.filter(Boolean),
+    allianceHubDelegationsData,
   )
 
   const delegations: Delegation[] = interchainDelegations.reduce(
-    (acc, { data }) => (data ? [...data?.delegation, ...acc] : acc),
-    [] as Delegation[]
+    (acc, item) => {
+      const data = item?.data
+      return data ? [...(data.delegation ?? []), ...acc] : acc
+    },
+    [] as Delegation[],
   )
+
   const allianceDelegations: AllianceDelegation[] =
-    allianceDelegationsData.reduce(
-      (acc, { data }) =>
-        data?.delegations ? [...data.delegations, ...acc] : acc,
-      [] as AllianceDelegation[]
-    )
+    allianceDelegationsData.reduce((acc, item) => {
+      const data = item?.data
+      return data?.delegations ? [...data.delegations, ...acc] : acc
+    }, [] as AllianceDelegation[])
+
   const allianceHubDelegations = getAllianceDelegations(
-    allianceHubDelegationsData?.data
+    allianceHubDelegationsData?.data,
   )
 
   const allDelegations = [
@@ -64,17 +68,18 @@ const Delegations = () => {
 
   const hubAddress = allianceHub.useHubAddress()
 
-  /* render */
   const title = t("Delegations")
 
   if (!allDelegations || !prices) return null
 
   let totalTokensAmount = 0
   const totalTokensPrice = allDelegations.reduce((acc, { balance }) => {
-    const { token, decimals } = readNativeDenom(balance?.denom ?? "")
+    const native = readNativeDenom(balance?.denom ?? "")
+    const token = native?.token ?? ""
+    const decimals = native?.decimals ?? 6
 
-    let amount = balance.amount.toNumber() ?? 0
-    let tokenPrice = prices[token]?.price ?? 0
+    const amount = balance?.amount?.toNumber?.() ?? 0
+    const tokenPrice = prices[token]?.price ?? 0
 
     totalTokensAmount += amount
     return acc + (amount * tokenPrice) / Math.pow(10, decimals)
@@ -114,16 +119,16 @@ const Delegations = () => {
             render: (address: AccAddress, r) => {
               if (address === hubAddress) {
                 return <AllianceHubStakeCTA denom={r.balance.denom} />
-              } else {
-                return (
-                  <StakingAssetLink
-                    address={address}
-                    denom={r.balance.denom}
-                    internal
-                    img
-                  />
-                )
               }
+
+              return (
+                <StakingAssetLink
+                  address={address}
+                  denom={r.balance.denom}
+                  internal
+                  img
+                />
+              )
             },
           },
           {

@@ -1,4 +1,4 @@
-import { CSSProperties, ReactNode, useMemo, useState } from "react"
+import React, { CSSProperties, ReactNode, useMemo, useState } from "react"
 import { path } from "ramda"
 import classNames from "classnames/bind"
 import { ReactComponent as DropUpIcon } from "styles/images/icons/DropUp.svg"
@@ -22,7 +22,6 @@ interface Column<T> {
   sorter?: Sorter<T>
   render?: (value: any, record: T, index: number) => ReactNode
   key?: string
-
   align?: "left" | "center" | "right"
   hidden?: boolean
 }
@@ -36,7 +35,6 @@ interface Props<T> {
   initialSorterKey?: string
   onSort?: () => void
   extra?: (data: T) => ReactNode
-
   className?: string
   size?: "default" | "small"
   bordered?: boolean
@@ -44,20 +42,78 @@ interface Props<T> {
   pagination?: number
 }
 
-function Table<T>({ dataSource, filter, rowKey, ...props }: Props<T>) {
-  const { initialSorterKey, size = "default", bordered, style } = props
-  const { pagination, className, extra } = props
-  const columns = props.columns.filter(({ hidden }) => !hidden)
+function Table<T>({
+  dataSource,
+  filter,
+  rowKey,
+  sorter: propSorter,
+  columns: rawColumns,
+  initialSorterKey,
+  onSort,
+  extra,
+  className,
+  size = "default",
+  bordered,
+  style,
+  pagination,
+}: Props<T>) {
+  const columns = rawColumns.filter(({ hidden }) => !hidden)
 
-  /* helpers */
   const getClassName = ({ align, dataIndex }: Column<T>) => cx(align, dataIndex)
+  const getRowId = (data: T, index: number) => rowKey?.(data) ?? String(index)
 
-  /* pagination */
   const [page, setPage] = useState(1)
+
+  const range = useMemo(() => {
+    if (!pagination) return undefined
+    const start = (page - 1) * pagination
+    const end = page * pagination
+    return [start, end] as const
+  }, [page, pagination])
+
+  const initIndex = () => {
+    if (!initialSorterKey) return
+    const index = columns.findIndex(({ key }) => key === initialSorterKey)
+    if (index > -1) return index
+  }
+
+  const initOrder = () => {
+    const index = initIndex()
+    if (typeof index === "number" && index > -1) {
+      return columns[index].defaultSortOrder
+    }
+  }
+
+  const [sorterIndex, setSorterIndex] = useState<number | undefined>(initIndex)
+  const [sortOrder, setSortOrder] = useState<SortOrder | undefined>(initOrder)
+  const [extraActive, setActive] = useState<string | undefined>()
+
+  const sorter = useMemo(() => {
+    if (typeof sorterIndex !== "number") return
+    const columnSorter = columns[sorterIndex]?.sorter
+    if (!columnSorter) return
+
+    return (a: T, b: T) => {
+      return (sortOrder === "desc" ? -1 : 1) * columnSorter(a, b)
+    }
+  }, [columns, sortOrder, sorterIndex])
+
+  const sortedData = useMemo(() => {
+    return [...dataSource]
+      .filter((data) => filter?.(data) ?? true)
+      .sort((a, b) => propSorter?.(a, b) || sorter?.(a, b) || 0)
+  }, [dataSource, filter, propSorter, sorter])
+
+  const pagedData = useMemo(() => {
+    if (!range) return sortedData
+    return sortedData.slice(...range)
+  }, [sortedData, range])
+
   const renderPagination = () => {
     if (!pagination) return null
-    const total = Math.ceil(dataSource.length / pagination)
+    const total = Math.ceil(sortedData.length / pagination)
     if (!total || total === 1) return null
+
     const prevPage = page > 1 ? () => setPage((p) => p - 1) : undefined
     const nextPage = page < total ? () => setPage((p) => p + 1) : undefined
 
@@ -73,40 +129,6 @@ function Table<T>({ dataSource, filter, rowKey, ...props }: Props<T>) {
     )
   }
 
-  const range = useMemo(() => {
-    if (!pagination) return []
-    const start = (page - 1) * pagination
-    const end = page * pagination
-    return [start, end] as const
-  }, [page, pagination])
-
-  /* sort */
-  const initIndex = () => {
-    if (!initialSorterKey) return
-    const index = columns.findIndex(({ key }) => key === initialSorterKey)
-    if (index > -1) return index
-  }
-
-  const initOrder = () => {
-    const index = initIndex()
-    if (typeof index === "number" && index > -1)
-      return columns[index].defaultSortOrder
-  }
-
-  const [sorterIndex, setSorterIndex] = useState<number | undefined>(initIndex)
-  const [sortOrder, setSortOrder] = useState<SortOrder | undefined>(initOrder)
-  const [extraActive, setActive] = useState<number | undefined>()
-
-  const sorter = useMemo(() => {
-    if (typeof sorterIndex !== "number") return
-    const { sorter } = columns[sorterIndex]
-    if (!sorter) throw new Error()
-
-    return (a: T, b: T) => {
-      return (sortOrder === "desc" ? -1 : 1) * sorter(a, b)
-    }
-  }, [columns, sortOrder, sorterIndex])
-
   const sort = (index: number) => {
     const { defaultSortOrder } = columns[index]
     const opposite = { asc: "desc" as const, desc: "asc" as const }
@@ -117,7 +139,7 @@ function Table<T>({ dataSource, filter, rowKey, ...props }: Props<T>) {
 
     setSorterIndex(index)
     setSortOrder(next)
-    props.onSort?.()
+    onSort?.()
   }
 
   return (
@@ -143,9 +165,13 @@ function Table<T>({ dataSource, filter, rowKey, ...props }: Props<T>) {
                 }
 
                 return (
-                  <th className={getClassName(column)} key={index}>
+                  <th
+                    className={getClassName(column)}
+                    key={column.key ?? index}
+                  >
                     {sorter && defaultSortOrder ? (
                       <button
+                        type="button"
                         className={styles.sorter}
                         onClick={() => sort(index)}
                       >
@@ -171,38 +197,45 @@ function Table<T>({ dataSource, filter, rowKey, ...props }: Props<T>) {
         )}
 
         <tbody>
-          {dataSource
-            .filter((data) => filter?.(data) ?? true)
-            .sort((a, b) => props.sorter?.(a, b) || sorter?.(a, b) || 0)
-            .slice(...range)
-            .map((data, index) => (
-              <>
-                <tr key={index} className={styles.row}>
+          {pagedData.map((data, index) => {
+            const rowId = getRowId(data, index)
+            const isExtraActive = extraActive === rowId
+
+            return (
+              <React.Fragment key={rowId}>
+                <tr className={styles.row}>
                   {extra && (
                     <td className={styles.extra__tooltip}>
                       <button
+                        type="button"
                         onClick={() =>
-                          setActive((i) => (i !== index ? index : undefined))
+                          setActive((current) =>
+                            current !== rowId ? rowId : undefined,
+                          )
                         }
-                        className={extraActive === index ? styles.active : ""}
+                        className={isExtraActive ? styles.active : ""}
                       >
                         <KeyboardArrowRightIcon />
                       </button>
                     </td>
                   )}
+
                   {columns.map((column, columnIndex) => {
                     const { dataIndex, render } = column
                     const value: any =
                       typeof dataIndex === "string"
                         ? data[dataIndex as keyof T]
                         : dataIndex
-                        ? path(dataIndex, data)
-                        : undefined
+                          ? path(dataIndex, data)
+                          : undefined
 
                     const children = render?.(value, data, index) ?? value
 
                     return (
-                      <td className={getClassName(column)} key={columnIndex}>
+                      <td
+                        className={getClassName(column)}
+                        key={column.key ?? columnIndex}
+                      >
                         {children}
                       </td>
                     )
@@ -213,16 +246,17 @@ function Table<T>({ dataSource, filter, rowKey, ...props }: Props<T>) {
                   <tr
                     className={cx(
                       styles.extra__content,
-                      extraActive !== index && styles.extra__content__disabled
+                      !isExtraActive && styles.extra__content__disabled,
                     )}
                   >
                     <td colSpan={columns.length + 1}>
-                      {extraActive === index && extra(data)}
+                      {isExtraActive && extra(data)}
                     </td>
                   </tr>
                 )}
-              </>
-            ))}
+              </React.Fragment>
+            )
+          })}
         </tbody>
       </table>
 

@@ -55,18 +55,23 @@ const QuickStakeForm = (props: Props) => {
     isAlliance,
     stakeOnAllianceHub,
   } = props
+
   const { t } = useTranslation()
   const addresses = useInterchainAddresses()
   const address = addresses?.[chainID]
   const network = useNetwork()
+  const currentNetwork = network?.[chainID]
+
   const { data: validators, ...validatorState } = useValidators(chainID)
   const { data: delegations, ...delegationsState } = useDelegations(
     chainID,
     isAlliance || action === QuickStakeAction.DELEGATE,
   )
+
   const allianceHub = useAllianceHub()
   const { data: allianceHubDelegations, ...allianceHubDelegationsState } =
     allianceHub.useDelegations()
+
   const filteredHubDelegationsByChainID =
     chainID !== undefined
       ? allianceHubDelegations?.filter((del) => del.chainID === chainID)
@@ -80,6 +85,7 @@ const QuickStakeForm = (props: Props) => {
 
   const readNativeDenom = useNativeDenoms()
   const { data: stakeParams, ...stakeState } = useStakingParams(chainID)
+
   const state = combineState(
     validatorState,
     delegationsState,
@@ -87,6 +93,7 @@ const QuickStakeForm = (props: Props) => {
     allianceDelegationsState,
     allianceHubDelegationsState,
   )
+
   const allianceHubContract = allianceHub.useHubAddress()
 
   /* form */
@@ -112,8 +119,9 @@ const QuickStakeForm = (props: Props) => {
   }, [validators])
 
   const stakeMsgs = useMemo(() => {
-    if (!address || !elegibleVals) return
+    if (!address || !elegibleVals || !allianceHubContract) return
     const { decimals } = readNativeDenom(denom)
+
     const coin = new Coin(
       denom,
       toAmount(
@@ -143,7 +151,9 @@ const QuickStakeForm = (props: Props) => {
   ])
 
   const unstakeMsgs = useMemo(() => {
-    if (!address || !(isAlliance ? allianceDelegations : delegations)) return
+    if (!address || !allianceHubContract) return
+    if (!(isAlliance ? allianceDelegations : delegations)) return
+
     const { decimals } = readNativeDenom(denom)
     const coin = new Coin(
       denom,
@@ -152,6 +162,7 @@ const QuickStakeForm = (props: Props) => {
         decimals ? { decimals } : { decimals: DEFAULT_NATIVE_DECIMALS },
       ),
     )
+
     return getQuickUnstakeMsgs(
       address,
       coin,
@@ -179,6 +190,7 @@ const QuickStakeForm = (props: Props) => {
     ({ input }: TxValues) => {
       const msgs =
         action === QuickStakeAction.DELEGATE ? stakeMsgs : unstakeMsgs
+
       if (!msgs) return
       return { msgs, chainID }
     },
@@ -222,7 +234,9 @@ const QuickStakeForm = (props: Props) => {
   )
 
   const asset = readNativeDenom(denom)
-  const feeTokenSymbol = readNativeDenom(network[chainID].baseAsset).symbol
+  const feeTokenSymbol = currentNetwork
+    ? readNativeDenom(currentNetwork.baseAsset).symbol
+    : asset.symbol
 
   const token = action === QuickStakeAction.DELEGATE ? denom : ""
 
@@ -261,17 +275,17 @@ const QuickStakeForm = (props: Props) => {
                       className={styles.token__icon}
                     />
                   )}
-                  {network && (
+                  {currentNetwork && (
                     <img
-                      src={network[chainID].icon}
-                      alt={network[chainID].name}
+                      src={currentNetwork.icon}
+                      alt={currentNetwork.name}
                       className={styles.chain__icon}
                     />
                   )}
                 </div>
                 {asset.name ?? asset.symbol}
                 <span className={styles.token__chain}>
-                  {network[chainID]?.name}
+                  {currentNetwork?.name ?? chainID}
                 </span>
               </Flex>
               <dl>
@@ -279,6 +293,7 @@ const QuickStakeForm = (props: Props) => {
                 <dd>{t("{{value}} days", { value: unbondingTime })}</dd>
               </dl>
             </FlexColumn>
+
             <Form onSubmit={handleSubmit(submit.fn)}>
               <FormItem
                 label={t("Amount")}
@@ -305,41 +320,43 @@ const QuickStakeForm = (props: Props) => {
                 />
               </FormItem>
 
-              {isAlliance && action === QuickStakeAction.DELEGATE && (
-                <FormHelp>
-                  <section className={styles.alliance__info}>
-                    {feeTokenSymbol} is needed to stake on{" "}
-                    {network[chainID].name}:
-                    <ul>
-                      <li>
-                        {feeTokenSymbol} is the fee token used on the{" "}
-                        {network[chainID].name} blockchain.
-                      </li>
-                      <li>
-                        To stake {asset.symbol} on {network[chainID].name},
-                        visit{" "}
-                        <ExternalLink href="https://tfm.com/ibc">
-                          https://tfm.com/ibc
-                        </ExternalLink>{" "}
-                        and swap any token for {feeTokenSymbol} on{" "}
-                        {network[chainID].name}. Make sure the {feeTokenSymbol}{" "}
-                        is being sent to your {network[chainID].name} wallet on
-                        Station.
-                      </li>
-                      <li>
-                        Send {feeTokenSymbol} to {network[chainID].name} by
-                        clicking 'Send' on your wallet sidebar and selecting
-                        your {network[chainID].name} address from your address
-                        book
-                      </li>
-                      <li>
-                        Return to Station's Stake page to stake your{" "}
-                        {asset.symbol} on {network[chainID].name}.
-                      </li>
-                    </ul>
-                  </section>
-                </FormHelp>
-              )}
+              {isAlliance &&
+                action === QuickStakeAction.DELEGATE &&
+                currentNetwork && (
+                  <FormHelp>
+                    <section className={styles.alliance__info}>
+                      {feeTokenSymbol} is needed to stake on{" "}
+                      {currentNetwork.name}:
+                      <ul>
+                        <li>
+                          {feeTokenSymbol} is the fee token used on the{" "}
+                          {currentNetwork.name} blockchain.
+                        </li>
+                        <li>
+                          To stake {asset.symbol} on {currentNetwork.name},
+                          visit{" "}
+                          <ExternalLink href="https://tfm.com/ibc">
+                            https://tfm.com/ibc
+                          </ExternalLink>{" "}
+                          and swap any token for {feeTokenSymbol} on{" "}
+                          {currentNetwork.name}. Make sure the {feeTokenSymbol}{" "}
+                          is being sent to your {currentNetwork.name} wallet on
+                          Station.
+                        </li>
+                        <li>
+                          Send {feeTokenSymbol} to {currentNetwork.name} by
+                          clicking &apos;Send&apos; on your wallet sidebar and
+                          selecting your {currentNetwork.name} address from your
+                          address book
+                        </li>
+                        <li>
+                          Return to Station&apos;s Stake page to stake your{" "}
+                          {asset.symbol} on {currentNetwork.name}.
+                        </li>
+                      </ul>
+                    </section>
+                  </FormHelp>
+                )}
 
               {fee.render()}
 

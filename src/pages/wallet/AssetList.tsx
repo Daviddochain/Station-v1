@@ -32,6 +32,7 @@ const AssetList = () => {
   const readNativeDenom = useNativeDenoms()
   const native = useCustomTokensNative()
   const cw20 = useCustomTokensCW20()
+
   const alwaysVisibleDenoms = useMemo(
     () =>
       new Set([
@@ -41,29 +42,33 @@ const AssetList = () => {
     [cw20.list, native.list],
   )
 
-  const unknownIBCDenomsData = useIBCBaseDenoms(
-    coins
-      .map(({ denom, chain }) => ({ denom, chainID: chain }))
-      .filter(({ denom, chainID }) => {
-        const data = readNativeDenom(denom, chainID)
-        return denom.startsWith("ibc/") && data.symbol.endsWith("...")
-      }),
-  )
+  const unknownIBCDenomsData =
+    useIBCBaseDenoms(
+      coins
+        .map(({ denom, chain }) => ({ denom, chainID: chain }))
+        .filter(({ denom, chainID }) => {
+          const data = readNativeDenom(denom, chainID)
+          return denom.startsWith("ibc/") && data.symbol.endsWith("...")
+        }),
+    ) ?? []
 
   const unknownIBCDenoms = unknownIBCDenomsData.reduce(
-    (acc, { data }) =>
-      data
+    (acc, item) => {
+      const data = item?.data
+
+      return data
         ? {
             ...acc,
             [[data.ibcDenom, data.chainIDs[data.chainIDs.length - 1]].join(
               "*",
             )]: {
               baseDenom: data.baseDenom,
-              chainID: data?.chainIDs[0],
-              chainIDs: data?.chainIDs,
+              chainID: data.chainIDs[0],
+              chainIDs: data.chainIDs,
             },
           }
-        : acc,
+        : acc
+    },
     {} as Record<
       string,
       { baseDenom: string; chainID: string; chainIDs: string[] }
@@ -84,13 +89,13 @@ const AssetList = () => {
 
               const data = readNativeDenom(resolvedBaseDenom, resolvedChainID)
 
-              const key = [
+              const resolvedAssetChainID =
                 unknownIBCDenoms[unknownIBCKey]?.chainIDs[0] ??
-                  // @ts-expect-error
-                  data?.chainID ??
-                  chain,
-                data.token,
-              ].join("*")
+                // @ts-expect-error
+                data?.chainID ??
+                chain
+
+              const key = [resolvedAssetChainID, data.token].join("*")
 
               if (acc[key]) {
                 acc[key].balance = `${
@@ -98,14 +103,14 @@ const AssetList = () => {
                 }`
                 acc[key].chains.push(chain)
                 return acc
-              } else if (
-                key === "columbus-5*uluna" &&
-                networkName !== "classic"
-              ) {
+              }
+
+              if (key === "columbus-5*uluna" && networkName !== "classic") {
                 return {
                   ...acc,
                   [key]: {
                     denom: data.token,
+                    chainID: resolvedAssetChainID,
                     balance: amount,
                     icon: "https://assets.terra.dev/icon/svg/LUNC.svg",
                     symbol: "LUNC",
@@ -116,26 +121,27 @@ const AssetList = () => {
                     whitelisted: true,
                   },
                 }
-              } else {
-                return {
-                  ...acc,
-                  [key]: {
-                    denom: data.token,
-                    balance: amount,
-                    icon: data.icon,
-                    symbol: data.symbol,
-                    price: prices?.[data.token]?.price ?? 0,
-                    change: prices?.[data.token]?.change ?? 0,
-                    chains: [chain],
-                    id: key,
-                    whitelisted: !(
-                      data.isNonWhitelisted ||
-                      unknownIBCDenoms[unknownIBCKey]?.chainIDs.find(
-                        (c) => !networks[c],
-                      )
-                    ),
-                  },
-                }
+              }
+
+              return {
+                ...acc,
+                [key]: {
+                  denom: data.token,
+                  chainID: resolvedAssetChainID,
+                  balance: amount,
+                  icon: data.icon,
+                  symbol: data.symbol,
+                  price: prices?.[data.token]?.price ?? 0,
+                  change: prices?.[data.token]?.change ?? 0,
+                  chains: [chain],
+                  id: key,
+                  whitelisted: !(
+                    data.isNonWhitelisted ||
+                    unknownIBCDenoms[unknownIBCKey]?.chainIDs.find(
+                      (c) => !networks[c],
+                    )
+                  ),
+                },
               }
             },
             {} as Record<string, any>,

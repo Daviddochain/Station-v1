@@ -8,7 +8,7 @@ import { useCustomLCDs } from "utils/localStorage"
 import { ChainFeature } from "types/chains"
 import { NetworkName, ChainID, InterchainNetwork } from "types/network"
 
-const networkState = atom({
+const networkState = atom<NetworkName>({
   key: "network",
   default: getStoredNetwork(),
 })
@@ -39,6 +39,7 @@ export const useNetworkOptions = () => {
 export const useNetworkWithFeature = (feature?: ChainFeature) => {
   const networks = useNetwork()
   if (!feature) return networks
+
   return Object.fromEntries(
     Object.entries(networks).filter(
       ([_, n]) =>
@@ -54,14 +55,16 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
   const wallet = useRecoilValue(walletState)
   const connectedWallet = useWallet()
   const { customLCDs } = useCustomLCDs()
-  const useOverrideAssets = process.env.REACT_APP_STATION_ASSETS
+  const useOverrideAssets = Boolean(process.env.REACT_APP_STATION_ASSETS)
 
   const walletWords = (wallet?.words ?? {}) as Record<
     string,
     string | undefined
   >
 
-  function withCustomLCDs(networks: Record<ChainID, InterchainNetwork>) {
+  function withCustomLCDs(
+    networks: Record<ChainID, InterchainNetwork>,
+  ): Record<ChainID, InterchainNetwork> {
     return Object.fromEntries(
       Object.entries(networks ?? {}).map(([key, val]) => [
         key,
@@ -70,7 +73,7 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
     )
   }
 
-  function getSelectedNetworks() {
+  function getSelectedNetworks(): Record<ChainID, InterchainNetwork> {
     return withCustomLCDs(
       (networks[network as NetworkName] as Record<
         ChainID,
@@ -110,7 +113,9 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
     const terra = Object.values(getSelectedNetworks() ?? {}).find(
       ({ prefix }) => prefix === "terra",
     )
+
     if (!terra) return {}
+
     return filterEnabledNetworks({ [terra.chainID]: terra })
   }
 
@@ -140,6 +145,7 @@ export const useNetworkName = () => {
 
 export const useChainID = () => {
   const network = useRecoilValue(networkState)
+
   switch (network) {
     case "mainnet":
       return "phoenix-1"
@@ -149,7 +155,7 @@ export const useChainID = () => {
       return "columbus-5"
     case "localterra":
       return "localterra"
+    default:
+      return ""
   }
-
-  return ""
 }
