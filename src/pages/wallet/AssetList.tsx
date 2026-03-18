@@ -15,7 +15,7 @@ import {
   useCustomTokensNative,
 } from "data/settings/CustomTokens"
 import { useIBCBaseDenoms } from "data/queries/ibc"
-import { useNetwork, useNetworkName } from "data/wallet"
+import { useChainID, useNetwork, useNetworkName } from "data/wallet"
 import { ReactComponent as ManageAssets } from "styles/images/icons/ManageAssets.svg"
 
 const MIN_VISIBLE_BALANCE = 0.01
@@ -26,6 +26,7 @@ const AssetList = () => {
   const { hideNoWhitelist, hideLowBal } = useTokenFilters()
   const networks = useNetwork()
   const networkName = useNetworkName()
+  const activeChainID = useChainID()
 
   const coins = useBankBalance()
   const { data: prices } = useExchangeRates()
@@ -75,120 +76,154 @@ const AssetList = () => {
     >,
   )
 
-  const list = useMemo(
-    () =>
-      [
-        ...Object.values(
-          coins.reduce(
-            (acc, { denom, amount, chain }) => {
-              const unknownIBCKey = [denom, chain].join("*")
-              const resolvedBaseDenom =
-                unknownIBCDenoms[unknownIBCKey]?.baseDenom ?? denom
-              const resolvedChainID =
-                unknownIBCDenoms[unknownIBCKey]?.chainIDs[0] ?? chain
+  const list = useMemo(() => {
+    const builtList = [
+      ...Object.values(
+        coins.reduce(
+          (acc, { denom, amount, chain }) => {
+            const unknownIBCKey = [denom, chain].join("*")
+            const resolvedBaseDenom =
+              unknownIBCDenoms[unknownIBCKey]?.baseDenom ?? denom
+            const resolvedChainID =
+              unknownIBCDenoms[unknownIBCKey]?.chainIDs[0] ?? chain
 
-              const data = readNativeDenom(resolvedBaseDenom, resolvedChainID)
+            const data = readNativeDenom(resolvedBaseDenom, resolvedChainID)
 
-              const resolvedAssetChainID =
-                unknownIBCDenoms[unknownIBCKey]?.chainIDs[0] ??
-                // @ts-expect-error
-                data?.chainID ??
-                chain
+            const resolvedAssetChainID =
+              unknownIBCDenoms[unknownIBCKey]?.chainIDs[0] ??
+              // @ts-expect-error
+              data?.chainID ??
+              chain
 
-              const key = [resolvedAssetChainID, data.token].join("*")
+            const key = [resolvedAssetChainID, data.token].join("*")
 
-              if (acc[key]) {
-                acc[key].balance = `${
-                  parseInt(acc[key].balance) + parseInt(amount)
-                }`
-                acc[key].chains.push(chain)
-                return acc
-              }
+            if (acc[key]) {
+              acc[key].balance = `${
+                parseInt(acc[key].balance) + parseInt(amount)
+              }`
+              acc[key].chains.push(chain)
+              return acc
+            }
 
-              if (key === "columbus-5*uluna" && networkName !== "classic") {
-                return {
-                  ...acc,
-                  [key]: {
-                    denom: data.token,
-                    chainID: resolvedAssetChainID,
-                    balance: amount,
-                    icon: "https://assets.terra.dev/icon/svg/LUNC.svg",
-                    symbol: "LUNC",
-                    price: prices?.["uluna:classic"]?.price ?? 0,
-                    change: prices?.["uluna:classic"]?.change ?? 0,
-                    chains: [chain],
-                    id: key,
-                    whitelisted: true,
-                  },
-                }
-              }
-
+            if (key === "columbus-5*uluna" && networkName !== "classic") {
               return {
                 ...acc,
                 [key]: {
                   denom: data.token,
                   chainID: resolvedAssetChainID,
                   balance: amount,
-                  icon: data.icon,
-                  symbol: data.symbol,
-                  price: prices?.[data.token]?.price ?? 0,
-                  change: prices?.[data.token]?.change ?? 0,
+                  icon: "https://assets.terra.dev/icon/svg/LUNC.svg",
+                  symbol: "LUNC",
+                  price: prices?.["uluna:classic"]?.price ?? 0,
+                  change: prices?.["uluna:classic"]?.change ?? 0,
                   chains: [chain],
                   id: key,
-                  whitelisted: !(
-                    data.isNonWhitelisted ||
-                    unknownIBCDenoms[unknownIBCKey]?.chainIDs.find(
-                      (c) => !networks[c],
-                    )
-                  ),
+                  whitelisted: true,
                 },
               }
-            },
-            {} as Record<string, any>,
-          ) ?? {},
-        ),
-      ]
-        .filter((a) => (hideNoWhitelist ? a.whitelisted : true))
-        .filter((a) => {
-          const chainID = a.id?.split("*")?.[0]
-          const { token, decimals } = readNativeDenom(a.denom, chainID)
+            }
 
-          const humanBalance = Number(toInput(a.balance, decimals ?? 6))
+            return {
+              ...acc,
+              [key]: {
+                denom: data.token,
+                chainID: resolvedAssetChainID,
+                balance: amount,
+                icon: data.icon,
+                symbol: data.symbol,
+                price: prices?.[data.token]?.price ?? 0,
+                change: prices?.[data.token]?.change ?? 0,
+                chains: [chain],
+                id: key,
+                whitelisted: !(
+                  data.isNonWhitelisted ||
+                  unknownIBCDenoms[unknownIBCKey]?.chainIDs.find(
+                    (c) => !networks[c],
+                  )
+                ),
+              },
+            }
+          },
+          {} as Record<string, any>,
+        ) ?? {},
+      ),
+    ]
 
-          if (humanBalance > MIN_VISIBLE_BALANCE) {
-            return true
-          }
+    const activeNetwork = activeChainID ? networks?.[activeChainID] : undefined
+    const activeBaseAsset = activeNetwork?.baseAsset
 
-          if (!hideLowBal || a.price === 0 || alwaysVisibleDenoms.has(token)) {
-            return true
-          }
+    if (activeChainID && activeBaseAsset) {
+      const baseData = readNativeDenom(activeBaseAsset, activeChainID)
+      const activeKey = `${activeChainID}*${baseData.token}`
 
-          return a.price * humanBalance >= 1
+      const alreadyExists = builtList.find((item) => item.id === activeKey)
+
+      if (!alreadyExists) {
+        builtList.unshift({
+          denom: baseData.token,
+          chainID: activeChainID,
+          balance: "0",
+          icon: baseData.icon,
+          symbol: baseData.symbol,
+          price: prices?.[baseData.token]?.price ?? 0,
+          change: prices?.[baseData.token]?.change ?? 0,
+          chains: [activeChainID],
+          id: activeKey,
+          whitelisted: true,
         })
-        .sort((a, b) => {
-          const chainIDA = a.id?.split("*")?.[0]
-          const chainIDB = b.id?.split("*")?.[0]
+      }
+    }
 
-          const decimalsA = readNativeDenom(a.denom, chainIDA).decimals ?? 6
-          const decimalsB = readNativeDenom(b.denom, chainIDB).decimals ?? 6
+    return builtList
+      .filter((a) => (hideNoWhitelist ? a.whitelisted : true))
+      .filter((a) => {
+        const chainID = a.id?.split("*")?.[0]
+        const { token, decimals } = readNativeDenom(a.denom, chainID)
 
-          const balanceA = Number(toInput(a.balance, decimalsA))
-          const balanceB = Number(toInput(b.balance, decimalsB))
+        const humanBalance = Number(toInput(a.balance, decimals ?? 6))
 
-          return b.price * balanceB - a.price * balanceA
-        }),
-    [
-      coins,
-      readNativeDenom,
-      prices,
-      hideNoWhitelist,
-      hideLowBal,
-      alwaysVisibleDenoms,
-      unknownIBCDenoms,
-      networks,
-      networkName,
-    ],
-  )
+        if (humanBalance > MIN_VISIBLE_BALANCE) {
+          return true
+        }
+
+        if (
+          activeChainID &&
+          chainID === activeChainID &&
+          a.denom === networks?.[activeChainID]?.baseAsset
+        ) {
+          return true
+        }
+
+        if (!hideLowBal || a.price === 0 || alwaysVisibleDenoms.has(token)) {
+          return true
+        }
+
+        return a.price * humanBalance >= 1
+      })
+      .sort((a, b) => {
+        const chainIDA = a.id?.split("*")?.[0]
+        const chainIDB = b.id?.split("*")?.[0]
+
+        const decimalsA = readNativeDenom(a.denom, chainIDA).decimals ?? 6
+        const decimalsB = readNativeDenom(b.denom, chainIDB).decimals ?? 6
+
+        const balanceA = Number(toInput(a.balance, decimalsA))
+        const balanceB = Number(toInput(b.balance, decimalsB))
+
+        return b.price * balanceB - a.price * balanceA
+      })
+  }, [
+    coins,
+    readNativeDenom,
+    prices,
+    hideNoWhitelist,
+    hideLowBal,
+    alwaysVisibleDenoms,
+    unknownIBCDenoms,
+    networks,
+    networkName,
+    activeChainID,
+  ])
 
   const render = () => {
     if (!coins) return

@@ -85,10 +85,37 @@ const queryCoinGeckoPrices = async (): Promise<
   return {}
 }
 
+const normalizeExternalPrice = (entry?: {
+  price?: number
+  change?: number
+  usd?: number
+  change24h?: number
+}): ExternalPrice => ({
+  usd: Number(entry?.usd ?? entry?.price ?? 0),
+  change24h: Number(entry?.change24h ?? entry?.change ?? 0),
+})
+
+const addPriceAlias = (
+  target: Record<string, ExternalPrice>,
+  key: string,
+  value?: ExternalPrice,
+) => {
+  if (!key || !value) return
+  target[key] = value
+}
+
 const queryCMCPrices = async (): Promise<Record<string, ExternalPrice>> => {
   try {
     const response = await axios.get<
-      Record<string, { price?: number; change?: number }>
+      Record<
+        string,
+        {
+          price?: number
+          change?: number
+          usd?: number
+          change24h?: number
+        }
+      >
     >("http://localhost:3001/api/prices", {
       timeout: 10000,
     })
@@ -100,38 +127,95 @@ const queryCMCPrices = async (): Promise<Record<string, ExternalPrice>> => {
       return {}
     }
 
-    const toExternalPrice = (entry?: {
-      price?: number
-      change?: number
-    }): ExternalPrice => ({
-      usd: entry?.price ?? 0,
-      change24h: entry?.change ?? 0,
+    const mapped: Record<string, ExternalPrice> = {}
+
+    Object.entries(data).forEach(([key, value]) => {
+      mapped[key] = normalizeExternalPrice(value)
+      mapped[key.toLowerCase()] = normalizeExternalPrice(value)
     })
 
-    return {
-      lunc: toExternalPrice(
-        data["uluna:classic"] ?? data.uluna_classic ?? data.uluna ?? data.lunc,
+    addPriceAlias(
+      mapped,
+      "lunc",
+      normalizeExternalPrice(
+        data["uluna:classic"] ?? data.uluna_classic ?? data.lunc,
       ),
-      luna2: toExternalPrice(data["uluna:phoenix"] ?? data.luna2 ?? data.luna),
-      ustc: toExternalPrice(data.uusd ?? data.ustc),
-      uusdc: toExternalPrice(data.uusdc ?? data.usdc),
-      uusdt: toExternalPrice(data.uusdt ?? data.usdt),
-      atom: toExternalPrice(data.uatom ?? data.atom),
-      osmo: toExternalPrice(data.uosmo ?? data.osmo),
-      juno: toExternalPrice(data.ujuno ?? data.juno),
-      sei: toExternalPrice(data.usei ?? data.sei),
-      inj: toExternalPrice(data.uinj ?? data.inj),
-      akt: toExternalPrice(data.uakt ?? data.akt),
-      scrt: toExternalPrice(data.uscrt ?? data.scrt),
-      kuji: toExternalPrice(data.ukuji ?? data.kuji),
-      stars: toExternalPrice(data.ustars ?? data.stars),
-      dydx: toExternalPrice(data.udydx ?? data.dydx),
-      ntrn: toExternalPrice(data.untrn ?? data.ntrn),
-      whale: toExternalPrice(data.uwhale ?? data.whale),
-      run: toExternalPrice(data.urun ?? data.run),
-      eth: toExternalPrice(data.weth ?? data.eth),
-      btc: toExternalPrice(data.wbtc ?? data.btc),
-    }
+    )
+    addPriceAlias(
+      mapped,
+      "luna2",
+      normalizeExternalPrice(
+        data["uluna:phoenix"] ?? data.uluna_phoenix ?? data.luna2 ?? data.luna,
+      ),
+    )
+    addPriceAlias(
+      mapped,
+      "ustc",
+      normalizeExternalPrice(data.uusd ?? data.ustc),
+    )
+    addPriceAlias(
+      mapped,
+      "uusdc",
+      normalizeExternalPrice(data.uusdc ?? data.usdc),
+    )
+    addPriceAlias(
+      mapped,
+      "uusdt",
+      normalizeExternalPrice(data.uusdt ?? data.usdt),
+    )
+    addPriceAlias(
+      mapped,
+      "atom",
+      normalizeExternalPrice(data.uatom ?? data.atom),
+    )
+    addPriceAlias(
+      mapped,
+      "osmo",
+      normalizeExternalPrice(data.uosmo ?? data.osmo),
+    )
+    addPriceAlias(
+      mapped,
+      "juno",
+      normalizeExternalPrice(data.ujuno ?? data.juno),
+    )
+    addPriceAlias(mapped, "sei", normalizeExternalPrice(data.usei ?? data.sei))
+    addPriceAlias(mapped, "inj", normalizeExternalPrice(data.uinj ?? data.inj))
+    addPriceAlias(mapped, "akt", normalizeExternalPrice(data.uakt ?? data.akt))
+    addPriceAlias(
+      mapped,
+      "scrt",
+      normalizeExternalPrice(data.uscrt ?? data.scrt),
+    )
+    addPriceAlias(
+      mapped,
+      "kuji",
+      normalizeExternalPrice(data.ukuji ?? data.kuji),
+    )
+    addPriceAlias(
+      mapped,
+      "stars",
+      normalizeExternalPrice(data.ustars ?? data.stars),
+    )
+    addPriceAlias(
+      mapped,
+      "dydx",
+      normalizeExternalPrice(data.udydx ?? data.dydx),
+    )
+    addPriceAlias(
+      mapped,
+      "ntrn",
+      normalizeExternalPrice(data.untrn ?? data.ntrn),
+    )
+    addPriceAlias(
+      mapped,
+      "whale",
+      normalizeExternalPrice(data.uwhale ?? data.whale),
+    )
+    addPriceAlias(mapped, "run", normalizeExternalPrice(data.urun ?? data.run))
+    addPriceAlias(mapped, "eth", normalizeExternalPrice(data.weth ?? data.eth))
+    addPriceAlias(mapped, "btc", normalizeExternalPrice(data.wbtc ?? data.btc))
+
+    return mapped
   } catch (error) {
     console.warn("Failed to load backend CoinMarketCap prices", error)
     return {}
@@ -163,14 +247,14 @@ const getUlunaPriceByChain = (
   prices: Record<string, ExternalPrice>,
 ) => {
   if (chainID === "columbus-5") {
-    return prices.lunc ?? { usd: 0, change24h: 0 }
+    return prices["uluna:classic"] ?? prices.lunc ?? { usd: 0, change24h: 0 }
   }
 
   if (chainID === "phoenix-1") {
-    return prices.luna2 ?? { usd: 0, change24h: 0 }
+    return prices["uluna:phoenix"] ?? prices.luna2 ?? { usd: 0, change24h: 0 }
   }
 
-  return prices.lunc ?? prices.luna2 ?? { usd: 0, change24h: 0 }
+  return prices.uluna ?? prices.lunc ?? prices.luna2 ?? { usd: 0, change24h: 0 }
 }
 
 export const useExchangeRates = () => {
@@ -195,6 +279,15 @@ export const useExchangeRates = () => {
 
       const activeUluna = getUlunaPriceByChain(chainID, mergedPrices)
 
+      const priceObject: PriceObject = {}
+
+      Object.entries(mergedPrices).forEach(([key, value]) => {
+        priceObject[key] = {
+          price: Number(value?.usd ?? 0) * fiatPrice,
+          change: Number(value?.change24h ?? 0),
+        }
+      })
+
       const luncPrice = (mergedPrices.lunc?.usd ?? 0) * fiatPrice
       const luncChange = mergedPrices.lunc?.change24h ?? 0
 
@@ -207,35 +300,39 @@ export const useExchangeRates = () => {
       const activeUlunaPrice = (activeUluna.usd ?? 0) * fiatPrice
       const activeUlunaChange = activeUluna.change24h ?? 0
 
-      const priceObject: PriceObject = {
-        uluna: {
-          price: activeUlunaPrice,
-          change: activeUlunaChange,
-        },
-        "uluna:classic": {
-          price: luncPrice,
-          change: luncChange,
-        },
-        "uluna:phoenix": {
-          price: luna2Price,
-          change: luna2Change,
-        },
-        lunc: {
-          price: luncPrice,
-          change: luncChange,
-        },
-        luna2: {
-          price: luna2Price,
-          change: luna2Change,
-        },
-        uusd: {
-          price: ustcPrice,
-          change: ustcChange,
-        },
-        ustc: {
-          price: ustcPrice,
-          change: ustcChange,
-        },
+      priceObject.uluna = {
+        price: activeUlunaPrice,
+        change: activeUlunaChange,
+      }
+
+      priceObject["uluna:classic"] = {
+        price: luncPrice,
+        change: luncChange,
+      }
+
+      priceObject["uluna:phoenix"] = {
+        price: luna2Price,
+        change: luna2Change,
+      }
+
+      priceObject.lunc = {
+        price: luncPrice,
+        change: luncChange,
+      }
+
+      priceObject.luna2 = {
+        price: luna2Price,
+        change: luna2Change,
+      }
+
+      priceObject.uusd = {
+        price: ustcPrice,
+        change: ustcChange,
+      }
+
+      priceObject.ustc = {
+        price: ustcPrice,
+        change: ustcChange,
       }
 
       if (mergedPrices.uusdc) {

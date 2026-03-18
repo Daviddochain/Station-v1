@@ -8,6 +8,7 @@ import { Card } from "components/layout"
 import DashboardContent from "../dashboard/components/DashboardContent"
 import PoolBreakdownModal from "../charts/components/PoolBreakdownModal"
 import { useSelectedDisplayChain } from "utils/localStorage"
+import { useNativeDenoms } from "data/token"
 
 type OraclePoolCoin = {
   denom: string
@@ -45,43 +46,12 @@ const isIbcCoin = (coin: OraclePoolCoin) => {
   return coin.denom.toLowerCase().startsWith("ibc/")
 }
 
-const getCoinLabel = (coin: OraclePoolCoin) => {
-  if (
-    coin.symbol &&
-    coin.symbol !== coin.denom &&
-    !coin.symbol.toLowerCase().startsWith("ibc/")
-  ) {
-    return coin.symbol
-  }
-
-  if (coin.denom === "uluna") return "LUNC"
-  if (coin.denom === "uusd") return "USTC"
-
-  return coin.denom.toUpperCase()
-}
-
-const getCoinAmount = (coin: OraclePoolCoin) => {
-  return new BigNumber(coin.amount || "0").dividedBy(1_000_000).toNumber()
-}
-
-const getCoinValue = (
-  coin: OraclePoolCoin,
-  luncPrice: number,
-  ustcPrice: number,
-) => {
-  const amount = getCoinAmount(coin)
-
-  if (coin.denom === "uluna") return amount * luncPrice
-  if (coin.denom === "uusd") return amount * ustcPrice
-
-  return 0
-}
-
 const OraclePool = () => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const selectedCurrency = useCurrency()
   const { data: prices } = useExchangeRates()
   const { selectedDisplayChain } = useSelectedDisplayChain()
+  const readNativeDenom = useNativeDenoms()
 
   const chainID = selectedDisplayChain || "columbus-5"
   const currencyCode = selectedCurrency?.id || "USD"
@@ -104,39 +74,82 @@ const OraclePool = () => {
     },
   )
 
-  const luncPrice = prices?.uluna?.price ?? 0
-  const ustcPrice = prices?.uusd?.price ?? 0
-
   const filteredCoins = useMemo(() => {
     if (!data?.coins?.length) return []
     return data.coins.filter((coin) => !isIbcCoin(coin))
   }, [data])
 
+  const getCoinLabel = (coin: OraclePoolCoin) => {
+    const native = readNativeDenom(coin.denom, chainID)
+
+    if (
+      coin.symbol &&
+      coin.symbol !== coin.denom &&
+      !coin.symbol.toLowerCase().startsWith("ibc/")
+    ) {
+      return coin.symbol
+    }
+
+    if (native?.symbol && native.symbol !== coin.denom) {
+      return native.symbol
+    }
+
+    return coin.denom.toUpperCase()
+  }
+
+  const getCoinAmount = (coin: OraclePoolCoin) => {
+    const decimals = readNativeDenom(coin.denom, chainID).decimals ?? 6
+    return new BigNumber(coin.amount || "0")
+      .dividedBy(new BigNumber(10).pow(decimals))
+      .toNumber()
+  }
+
+  const getCoinPrice = (coin: OraclePoolCoin) => {
+    const native = readNativeDenom(coin.denom, chainID)
+    const symbol = native?.symbol
+
+    return (
+      (symbol === "LUNC" ? prices?.["uluna:classic"]?.price : undefined) ??
+      (symbol === "LUNA" ? prices?.["uluna:phoenix"]?.price : undefined) ??
+      prices?.[`${chainID}:${coin.denom}`]?.price ??
+      prices?.[coin.denom]?.price ??
+      prices?.[native?.token ?? ""]?.price ??
+      prices?.[symbol?.toLowerCase?.() ?? ""]?.price ??
+      0
+    )
+  }
+
   const totalValue = useMemo(() => {
     if (!filteredCoins.length) return 0
 
     return filteredCoins.reduce((sum, coin) => {
-      return sum + getCoinValue(coin, luncPrice, ustcPrice)
+      return sum + getCoinAmount(coin) * getCoinPrice(coin)
     }, 0)
-  }, [filteredCoins, luncPrice, ustcPrice])
+  }, [filteredCoins, prices, chainID])
 
-  const luncRow = useMemo(() => {
-    return filteredCoins.find((coin) => coin.denom === "uluna") || null
-  }, [filteredCoins])
+  const primaryRow = useMemo(() => {
+    if (!filteredCoins.length) return null
 
-  const luncAmountDisplay = useMemo(() => {
-    if (!luncRow) return "-- LUNC"
+    return [...filteredCoins].sort((a, b) => {
+      const aValue = getCoinAmount(a) * getCoinPrice(a)
+      const bValue = getCoinAmount(b) * getCoinPrice(b)
+      return bValue - aValue
+    })[0]
+  }, [filteredCoins, prices, chainID])
 
-    const amount = getCoinAmount(luncRow)
-    return `${formatCompact(amount)} LUNC`
-  }, [luncRow])
+  const primaryAmountDisplay = useMemo(() => {
+    if (!primaryRow) return "--"
+
+    const amount = getCoinAmount(primaryRow)
+    return `${formatCompact(amount)} ${getCoinLabel(primaryRow)}`
+  }, [primaryRow, chainID])
 
   const rows = useMemo(() => {
     if (!filteredCoins.length) return []
 
     return filteredCoins.map((coin) => {
       const amount = getCoinAmount(coin)
-      const coinValue = getCoinValue(coin, luncPrice, ustcPrice)
+      const coinValue = amount * getCoinPrice(coin)
 
       return {
         denom: getCoinLabel(coin),
@@ -147,7 +160,7 @@ const OraclePool = () => {
           coinValue > 0 ? formatCompact(coinValue, currencyCode) : "-",
       }
     })
-  }, [filteredCoins, luncPrice, ustcPrice, currencyCode])
+  }, [filteredCoins, prices, chainID, currencyCode])
 
   return (
     <>
@@ -160,7 +173,7 @@ const OraclePool = () => {
         <DashboardContent value={formatCompact(totalValue, currencyCode)} />
 
         <div style={{ marginTop: 8, opacity: 0.7, fontWeight: 700 }}>
-          {luncAmountDisplay}
+          {primaryAmountDisplay}
         </div>
 
         <button

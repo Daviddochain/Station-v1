@@ -356,7 +356,10 @@ export const useAllStakingParams = () => {
       !network.disabledModules.includes(ChainFeature.STAKING)
 
     return (
-      stakingEnabled && (chainID === "phoenix-1" || chainID === "columbus-5")
+      stakingEnabled &&
+      (chainID === "phoenix-1" ||
+        chainID === "columbus-5" ||
+        chainID === "dungeon-1")
     )
   })
 

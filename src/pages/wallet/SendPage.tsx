@@ -122,7 +122,7 @@ const SendPage = () => {
     asset,
   } = watch()
 
-  const decimals = asset ? readNativeDenom(asset).decimals : 6
+  const decimals = asset ? readNativeDenom(asset, chain).decimals : 6
   const amount = toAmount(input, { decimals })
 
   const defaultAsset = route?.denom || filteredAssets[0]?.denom
@@ -142,9 +142,9 @@ const SendPage = () => {
   }, [asset, availableAssets, defaultAsset, networks])
 
   const token = balances.find(
-    ({ denom, chain }) =>
-      chain === watch("chain") &&
-      readNativeDenom(denom).token === watch("asset"),
+    ({ denom, chain: balanceChain }) =>
+      balanceChain === watch("chain") &&
+      readNativeDenom(denom, balanceChain).token === watch("asset"),
   )
 
   useEffect(() => {
@@ -316,7 +316,7 @@ const SendPage = () => {
   const coins = [{ input, denom: "" }] as CoinInput[]
   const estimationTxValues = useMemo(() => {
     return {
-      address: addresses?.[chain ?? "phoenix-1"],
+      address: chain ? addresses?.[chain] : undefined,
       input: toInput(1, decimals),
     }
   }, [addresses, decimals, chain])
@@ -417,7 +417,8 @@ const SendPage = () => {
                               chain ?? "",
                               token?.denom ?? "",
                               getIBCChannel,
-                              readNativeDenom(token?.denom ?? "").isAxelar,
+                              readNativeDenom(token?.denom ?? "", chain)
+                                .isAxelar,
                             ),
                           },
                         })}

@@ -70,7 +70,9 @@ const Validators = () => {
 
       return (
         stakingEnabled &&
-        (actualChainID === "phoenix-1" || actualChainID === "columbus-5")
+        (actualChainID === "phoenix-1" ||
+          actualChainID === "columbus-5" ||
+          actualChainID === "dungeon-1")
       )
     }),
   ) as Record<string, StakingNetwork>
@@ -179,7 +181,7 @@ const Validators = () => {
 
   const tokenList = options.reduce(
     (acc, { denom, chainID }) => {
-      const native = readNativeDenom(denom)
+      const native = readNativeDenom(denom, chainID)
       if (!native || native.type === TokenType.IBC) return acc
 
       const key = `${chainID}:${native.lsd ?? native.token}`
@@ -250,7 +252,7 @@ const Validators = () => {
               dataSource={options.filter(({ denom, chainID }) => {
                 if (!token) return true
 
-                const native = readNativeDenom(denom)
+                const native = readNativeDenom(denom, chainID)
                 const optionKey = `${chainID}:${native.lsd ?? native.token}`
 
                 return optionKey === token
@@ -269,7 +271,7 @@ const Validators = () => {
                   dataIndex: ["asset", "chainID"],
                   render: (_: unknown, option: ValidatorOption) => {
                     const { denom, chainID, isAlliance } = option
-                    const tokenInfo = readNativeDenom(denom)
+                    const tokenInfo = readNativeDenom(denom, chainID)
 
                     const networkEntry = Object.entries(stakingNetworks).find(
                       ([networkKey, network]) => {

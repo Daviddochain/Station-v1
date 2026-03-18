@@ -7,6 +7,7 @@ import { useExchangeRates } from "data/queries/coingecko"
 import { Card } from "components/layout"
 import DashboardContent from "../dashboard/components/DashboardContent"
 import PoolBreakdownModal from "./components/PoolBreakdownModal"
+import { useNativeDenoms } from "data/token"
 
 type Props = {
   chainID: string
@@ -43,44 +44,11 @@ const formatCompact = (value: number, currencyCode?: string) => {
   }).format(value)
 }
 
-const getCoinLabel = (coin: CommunityPoolCoin, index?: number) => {
-  if (
-    coin.symbol &&
-    coin.symbol !== coin.denom &&
-    !coin.symbol.toLowerCase().startsWith("ibc/")
-  ) {
-    return coin.symbol
-  }
-
-  if (coin.denom === "uluna") return "LUNC"
-  if (coin.denom === "uusd") return "USTC"
-
-  if (coin.denom.toLowerCase().startsWith("ibc/")) {
-    return `IBC Asset ${index !== undefined ? index + 1 : ""}`.trim()
-  }
-
-  return coin.denom.toUpperCase()
-}
-
-const getCoinValue = (
-  coin: CommunityPoolCoin,
-  luncPrice: number,
-  ustcPrice: number,
-) => {
-  const amount = new BigNumber(coin.amount || "0")
-    .dividedBy(1_000_000)
-    .toNumber()
-
-  if (coin.denom === "uluna") return amount * luncPrice
-  if (coin.denom === "uusd") return amount * ustcPrice
-
-  return 0
-}
-
 const CommunityPool = ({ chainID }: Props) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const selectedCurrency = useCurrency()
   const { data: prices } = useExchangeRates()
+  const readNativeDenom = useNativeDenoms()
 
   const currencyCode = selectedCurrency?.id || "USD"
 
@@ -102,54 +70,100 @@ const CommunityPool = ({ chainID }: Props) => {
     },
   )
 
-  const luncPrice = prices?.uluna?.price ?? 0
-  const ustcPrice = prices?.uusd?.price ?? 0
+  const getCoinLabel = (coin: CommunityPoolCoin, index?: number) => {
+    const native = readNativeDenom(coin.denom, chainID)
+
+    if (
+      coin.symbol &&
+      coin.symbol !== coin.denom &&
+      !coin.symbol.toLowerCase().startsWith("ibc/")
+    ) {
+      return coin.symbol
+    }
+
+    if (native?.symbol && native.symbol !== coin.denom) {
+      return native.symbol
+    }
+
+    if (coin.denom.toLowerCase().startsWith("ibc/")) {
+      return `IBC Asset ${index !== undefined ? index + 1 : ""}`.trim()
+    }
+
+    return coin.denom.toUpperCase()
+  }
+
+  const getCoinAmount = (coin: CommunityPoolCoin) => {
+    const decimals = readNativeDenom(coin.denom, chainID).decimals ?? 6
+
+    return new BigNumber(coin.amount || "0")
+      .dividedBy(new BigNumber(10).pow(decimals))
+      .toNumber()
+  }
+
+  const getCoinPrice = (coin: CommunityPoolCoin) => {
+    const native = readNativeDenom(coin.denom, chainID)
+    const symbol = native?.symbol
+
+    return (
+      (symbol === "LUNC" ? prices?.["uluna:classic"]?.price : undefined) ??
+      (symbol === "LUNA" ? prices?.["uluna:phoenix"]?.price : undefined) ??
+      prices?.[`${chainID}:${coin.denom}`]?.price ??
+      prices?.[coin.denom]?.price ??
+      prices?.[native?.token ?? ""]?.price ??
+      prices?.[symbol?.toLowerCase?.() ?? ""]?.price ??
+      0
+    )
+  }
 
   const totalValue = useMemo(() => {
     if (!data?.coins?.length) return 0
 
     return data.coins.reduce((sum, coin) => {
-      return sum + getCoinValue(coin, luncPrice, ustcPrice)
+      return sum + getCoinAmount(coin) * getCoinPrice(coin)
     }, 0)
-  }, [data, luncPrice, ustcPrice])
+  }, [data, prices, chainID])
 
-  const luncRow = useMemo(() => {
-    return data?.coins?.find((coin) => coin.denom === "uluna") || null
-  }, [data])
+  const primaryRow = useMemo(() => {
+    if (!data?.coins?.length) return null
 
-  const luncAmountDisplay = useMemo(() => {
-    if (!luncRow) return "-- LUNC"
+    return (
+      [...data.coins]
+        .filter((coin) => !coin.denom.toLowerCase().startsWith("ibc/"))
+        .sort((a, b) => {
+          const aValue = getCoinAmount(a) * getCoinPrice(a)
+          const bValue = getCoinAmount(b) * getCoinPrice(b)
+          return bValue - aValue
+        })[0] || null
+    )
+  }, [data, prices, chainID])
 
-    const amount = new BigNumber(luncRow.amount || "0")
-      .dividedBy(1_000_000)
-      .toNumber()
+  const primaryAmountDisplay = useMemo(() => {
+    if (!primaryRow) return "--"
 
-    return `${formatCompact(amount)} LUNC`
-  }, [luncRow])
+    const amount = getCoinAmount(primaryRow)
+    return `${formatCompact(amount)} ${getCoinLabel(primaryRow)}`
+  }, [primaryRow, chainID])
 
   const rows = useMemo(() => {
     if (!data?.coins?.length) return []
 
     return data.coins
       .filter((coin) => !coin.denom.toLowerCase().startsWith("ibc/"))
-      .map((coin) => {
-        const amount = new BigNumber(coin.amount || "0")
-          .dividedBy(1_000_000)
-          .toNumber()
-
-        const coinValue = getCoinValue(coin, luncPrice, ustcPrice)
-        const label = getCoinLabel(coin)
+      .map((coin, index) => {
+        const amount = getCoinAmount(coin)
+        const coinValue = amount * getCoinPrice(coin)
+        const label = getCoinLabel(coin, index)
 
         return {
           denom: label,
-          amount: amount,
+          amount,
           value: coinValue,
           amountDisplay: formatCompact(amount),
           valueDisplay:
             coinValue > 0 ? formatCompact(coinValue, currencyCode) : "-",
         }
       })
-  }, [data, luncPrice, ustcPrice, currencyCode])
+  }, [data, prices, chainID, currencyCode])
 
   return (
     <>
@@ -163,7 +177,7 @@ const CommunityPool = ({ chainID }: Props) => {
         <DashboardContent value={formatCompact(totalValue, currencyCode)} />
 
         <div style={{ marginTop: 8, opacity: 0.7, fontWeight: 700 }}>
-          {luncAmountDisplay}
+          {primaryAmountDisplay}
         </div>
 
         <button

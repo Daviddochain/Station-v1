@@ -33,19 +33,35 @@ export const useRewards = (chainID?: string) => {
         const address = addresses[chainID]
         if (!address) return { total: new Coins(), rewards: {} }
 
-        return await lcd.distribution.rewards(address)
+        try {
+          return await lcd.distribution.rewards(address)
+        } catch (error) {
+          console.warn(`Failed to load rewards for ${chainID}`, error)
+          return { total: new Coins(), rewards: {} }
+        }
       }
 
+      const entries = Object.entries(addresses)
+
       const results = await Promise.all(
-        Object.values(addresses).map((address) =>
-          lcd.distribution.rewards(address as string),
-        ),
+        entries.map(async ([entryChainID, address]) => {
+          try {
+            const result = await lcd.distribution.rewards(address as string)
+            return { chainID: entryChainID, result }
+          } catch (error) {
+            console.warn(`Failed to load rewards for ${entryChainID}`, error)
+            return {
+              chainID: entryChainID,
+              result: { total: new Coins(), rewards: {} },
+            }
+          }
+        }),
       )
 
       let total: Coin.Data[] = []
       let rewards = {}
 
-      results.forEach((result) => {
+      results.forEach(({ result }) => {
         total = [...total, ...result.total.toData()]
         rewards = { ...rewards, ...result.rewards }
       })
@@ -65,7 +81,13 @@ export const useCommunityPool = (chain?: string) => {
     [queryKey.distribution.communityPool, activeChain],
     async () => {
       if (!activeChain) return new Coins()
-      return await lcd.distribution.communityPool(activeChain)
+
+      try {
+        return await lcd.distribution.communityPool(activeChain)
+      } catch (error) {
+        console.warn(`Failed to load community pool for ${activeChain}`, error)
+        return new Coins()
+      }
     },
     {
       ...RefetchOptions.INFINITY,
@@ -90,7 +112,15 @@ export const useValidatorCommission = () => {
         AccAddress.getPrefix(address),
       )
 
-      return await lcd.distribution.validatorCommission(validatorAddress)
+      try {
+        return await lcd.distribution.validatorCommission(validatorAddress)
+      } catch (error) {
+        console.warn(
+          `Failed to load validator commission for ${address}`,
+          error,
+        )
+        return new Coins()
+      }
     },
     {
       ...RefetchOptions.DEFAULT,
@@ -108,7 +138,13 @@ export const useWithdrawAddress = () => {
     [queryKey.distribution.withdrawAddress, address],
     async () => {
       if (!address) return
-      return await lcd.distribution.withdrawAddress(address)
+
+      try {
+        return await lcd.distribution.withdrawAddress(address)
+      } catch (error) {
+        console.warn(`Failed to load withdraw address for ${address}`, error)
+        return
+      }
     },
     {
       ...RefetchOptions.DEFAULT,

@@ -88,58 +88,55 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
   const readNativeDenom = useNativeDenoms()
 
   const bankBalance = useBankBalance()
-  const token = networks[chain].baseAsset
-  const decimals = readNativeDenom(token ?? "").decimals
-  const balance = bankBalance.find((b) => b.denom === token)?.amount ?? "0"
+  const token = networks[chain]?.baseAsset ?? ""
+  const decimals = readNativeDenom(token, chain).decimals ?? 6
+  const balance =
+    bankBalance.find((b) => b.chain === chain && b.denom === token)?.amount ??
+    "0"
 
-  /* tx context */
   const defaultCoinItem = { denom: token }
 
   const { data: communityPool, ...communityPoolState } = useCommunityPool(chain)
   const { data: depositParams, ...depositParamsState } = useDepositParams(chain)
   const state = combineState(communityPoolState, depositParamsState)
-  //if(!depositParams || communityPool) return null
+
   const minDeposit = depositParams
     ? getAmount(depositParams.min_deposit, token)
     : 0
 
-  /* form */
   const form = useForm<TxValues>({
     mode: "onChange",
     defaultValues: {
       input: toInput(minDeposit, decimals),
       coins: [defaultCoinItem],
-    },
+    } as any,
   })
 
   const { register, trigger, control, watch, setValue, handleSubmit } = form
   const { errors } = form.formState
-  const { input, ...values } = watch()
+  const { input, ...values } = watch() as TxValues
   const amount = toAmount(input, { decimals })
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: "changes",
+    name: "changes" as never,
   })
-  const coinsFieldArray = useFieldArray({ control, name: "coins" })
+  const coinsFieldArray = useFieldArray({ control, name: "coins" as never })
 
-  /* update input */
   useEffect(() => {
     setValue("input", toInput(minDeposit, decimals))
   }, [minDeposit, setValue, decimals])
 
-  /* effect: ParameterChangeProposal */
   const shouldAppendChange =
     values.type === ProposalType.PARAMS && !values.changes.length
 
   useEffect(() => {
-    if (shouldAppendChange) append(DEFAULT_PAREMETER_CHANGE)
+    if (shouldAppendChange) append(DEFAULT_PAREMETER_CHANGE as never)
   }, [append, shouldAppendChange])
 
-  /* tx */
   const createTx = useCallback(
     ({ input, title, description, ...values }: TxValues) => {
-      if (!addresses) return
+      if (!addresses || !token) return
       const amount = toAmount(input, { decimals })
       const deposit = has(amount) ? new Coins({ [token]: amount }) : []
 
@@ -151,7 +148,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
             title,
             description,
             recipient,
-            coins
+            coins,
           )
         }
 
@@ -170,7 +167,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
             runAs,
             contractAddress,
             execute_msg,
-            coins
+            coins,
           )
         }
 
@@ -182,10 +179,9 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
       ]
       return { msgs, chainID: chain ?? "" }
     },
-    [addresses, chain, token, decimals]
+    [addresses, chain, token, decimals],
   )
 
-  /* fee */
   const estimationTxValues = useMemo(
     (): TxValues => ({
       type: ProposalType.TEXT,
@@ -193,7 +189,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
       description: ESTIMATE.DESCRIPTION,
       input: toInput(balance, decimals),
     }),
-    [balance, decimals]
+    [balance, decimals],
   )
 
   const onChangeMax = useCallback(
@@ -201,7 +197,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
       setValue("input", input)
       await trigger("input")
     },
-    [setValue, trigger]
+    [setValue, trigger],
   )
 
   const tx = {
@@ -220,8 +216,8 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
 
   const render = () => {
     if (values.type === ProposalType.SPEND) {
-      // @ts-expect-error
-      const max = values.spend && getAmount(communityPool, values.spend.denom)
+      const max =
+        values.spend && getAmount(communityPool ?? [], values.spend.denom)
       const placeholder = readAmount(max, { integer: true })
 
       return (
@@ -233,7 +229,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
             }
           >
             <Input
-              {...register("spend.recipient", {
+              {...register("spend.recipient" as const, {
                 validate: validate.address(),
               })}
               placeholder={SAMPLE_ADDRESS}
@@ -245,7 +241,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
             error={"spend" in errors ? errors.spend?.input?.message : undefined}
           >
             <Input
-              {...register("spend.input", {
+              {...register("spend.input" as const, {
                 valueAsNumber: true,
                 validate: validate.input(toInput(max, decimals), decimals),
               })}
@@ -253,10 +249,10 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
               type="number"
               placeholder={placeholder}
               selectBefore={
-                <Select {...register("spend.denom")} before>
-                  {[networks[chain].baseAsset].map((denom) => (
+                <Select {...register("spend.denom" as const)} before>
+                  {[token].map((denom) => (
                     <option value={denom} key={denom}>
-                      {readNativeDenom(denom).symbol}
+                      {readNativeDenom(denom, chain).symbol}
                     </option>
                   ))}
                 </Select>
@@ -276,7 +272,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
               button={
                 length - 1 === index
                   ? {
-                      onClick: () => append(DEFAULT_PAREMETER_CHANGE),
+                      onClick: () => append(DEFAULT_PAREMETER_CHANGE as never),
                       children: <AddIcon style={{ fontSize: 18 }} />,
                     }
                   : {
@@ -286,10 +282,9 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
               }
               key={id}
             >
-              {/* do not translate labels here */}
               <FormItem label="subspace">
                 <Input
-                  {...register(`changes.${index}.subspace`, {
+                  {...register(`changes.${index}.subspace` as const, {
                     required: "`subspace` is required",
                   })}
                   placeholder="staking"
@@ -298,7 +293,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
 
               <FormItem label="key">
                 <Input
-                  {...register(`changes.${index}.key`, {
+                  {...register(`changes.${index}.key` as const, {
                     required: "`key` is required",
                   })}
                   placeholder="MaxValidators"
@@ -307,7 +302,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
 
               <FormItem label="value">
                 <Input
-                  {...register(`changes.${index}.value`, {
+                  {...register(`changes.${index}.value` as const, {
                     required: "`value` is required",
                   })}
                   placeholder="100"
@@ -330,7 +325,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
             error={"runAs" in errors ? errors.runAs?.message : undefined}
           >
             <Input
-              {...register("runAs", { validate: validate.address() })}
+              {...register("runAs" as const, { validate: validate.address() })}
               placeholder={SAMPLE_ADDRESS}
             />
           </FormItem>
@@ -344,18 +339,19 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
             }
           >
             <Input
-              {...register("contractAddress", { validate: validate.address() })}
+              {...register("contractAddress" as const, {
+                validate: validate.address(),
+              })}
               placeholder={SAMPLE_ADDRESS}
             />
           </FormItem>
 
           <FormItem
-            /* do not translate */
             label="Msg"
             error={"msg" in errors ? errors.msg?.message : undefined}
           >
             <TextArea
-              {...register("msg", { validate: validate.msg() })}
+              {...register("msg" as const, { validate: validate.msg() })}
               placeholder="{}"
             />
           </FormItem>
@@ -366,7 +362,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
                 button={
                   length - 1 === index
                     ? {
-                        onClick: () => append(defaultCoinItem),
+                        onClick: () => append(defaultCoinItem as never),
                         children: <AddIcon style={{ fontSize: 18 }} />,
                       }
                     : {
@@ -377,19 +373,25 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
                 key={id}
               >
                 <Input
-                  {...register(`coins.${index}.input`, {
+                  {...register(`coins.${index}.input` as const, {
                     valueAsNumber: true,
                   })}
                   inputMode="decimal"
                   type="number"
                   placeholder={getPlaceholder()}
                   selectBefore={
-                    <Select {...register(`coins.${index}.denom`)} before>
+                    <Select
+                      {...register(`coins.${index}.denom` as const)}
+                      before
+                    >
                       {bankBalance
-                        .filter(({ denom }) => isDenomTerraNative(denom))
+                        .filter(
+                          ({ denom, chain: balanceChain }) =>
+                            balanceChain === chain && isDenomTerraNative(denom),
+                        )
                         .map(({ denom }) => (
                           <option value={denom} key={denom}>
-                            {readNativeDenom(denom).symbol}
+                            {readNativeDenom(denom, chain).symbol}
                           </option>
                         ))}
                     </Select>
@@ -401,6 +403,8 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
         </>
       )
     }
+
+    return null
   }
 
   return (
@@ -409,7 +413,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
         {({ max, fee, submit }) => (
           <Form onSubmit={handleSubmit(submit.fn)}>
             <Grid gap={4}>
-              {networks[chain]?.prefix === "terra" && (
+              {chain === "phoenix-1" && (
                 <FormHelp>
                   Upload proposal only after forum discussion on{" "}
                   <ExternalLink href="https://commonwealth.im/terra">
@@ -419,7 +423,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
               )}
               <FormWarning>
                 {t(
-                  "Proposal deposits will not be refunded if the proposal is vetoed, fails to meet quorum, or does not meet the minimum deposit"
+                  "Proposal deposits will not be refunded if the proposal is vetoed, fails to meet quorum, or does not meet the minimum deposit",
                 )}
               </FormWarning>
               {values.type === ProposalType.TEXT && (
@@ -430,7 +434,7 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
             </Grid>
 
             <FormItem label={t("Proposal type")} error={errors.type?.message}>
-              <Select {...register("type")}>
+              <Select {...register("type" as const)}>
                 {Object.values(ProposalType ?? {}).map((type) => (
                   <option value={type} key={type}>
                     {t(type)}
@@ -441,7 +445,9 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
 
             <FormItem label={t("Title")} error={errors.title?.message}>
               <Input
-                {...register("title", { required: "Title is required" })}
+                {...register("title" as const, {
+                  required: "Title is required",
+                })}
                 placeholder={t("Burn community pool")}
                 autoFocus
               />
@@ -452,15 +458,15 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
               error={errors.description?.message}
             >
               <TextArea
-                {...register("description", {
+                {...register("description" as const, {
                   required: "Description is required",
                 })}
                 placeholder={t(
                   `We're proposing to spend 100,000 ${
-                    readNativeDenom(networks[chain].baseAsset).symbol
+                    readNativeDenom(token, chain).symbol
                   } from the Community Pool to fund the creation of public goods for the ${
-                    networks[chain].name
-                  } ecosystem`
+                    networks[chain]?.name
+                  } ecosystem`,
                 )}
               />
             </FormItem>
@@ -469,13 +475,11 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
               label={
                 <TooltipIcon
                   content={`To help push the proposal to the voting period, consider depositing more ${
-                    readNativeDenom(networks[chain].baseAsset).symbol
+                    readNativeDenom(token, chain).symbol
                   } to reach the minimum ${
                     Number(minDeposit) /
-                    10 ** readNativeDenom(networks[chain].baseAsset).decimals
-                  } ${
-                    readNativeDenom(networks[chain].baseAsset).symbol
-                  } (optional).`}
+                    10 ** (readNativeDenom(token, chain).decimals ?? 6)
+                  } ${readNativeDenom(token, chain).symbol} (optional).`}
                 >
                   {t("Initial deposit")} ({t("optional")})
                 </TooltipIcon>
@@ -484,17 +488,17 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
               error={errors.input?.message}
             >
               <Input
-                {...register("input", {
+                {...register("input" as const, {
                   valueAsNumber: true,
                   validate: validate.input(
                     toInput(max.amount, decimals),
                     decimals,
                     "Initial deposit",
-                    true
+                    true,
                   ),
                 })}
                 type="number"
-                token={networks[chain].baseAsset}
+                token={token}
                 onFocus={max.reset}
                 inputMode="decimal"
               />
@@ -512,7 +516,6 @@ const SubmitProposalForm = ({ chain }: { chain: string }) => {
 
 export default SubmitProposalForm
 
-/* fee estimation */
 const ESTIMATE = {
   TITLE: "Lorem ipsum",
   DESCRIPTION:

@@ -40,14 +40,26 @@ export const DefaultCustomTokensItem = (chainID: string) => ({
 })
 
 export const DefaultDisplayChains = {
-  mainnet: ["phoenix-1", "osmosis-1"],
+  mainnet: ["phoenix-1", "osmosis-1", "dungeon-1"], // ✅ added Dungeon
   testnet: ["pisco-1"],
   classic: ["columbus-5"],
   localterra: ["localterra"],
 }
 
 export const DefaultCustomTokens = {
-  mainnet: DefaultCustomTokensItem("phoenix-1"),
+  mainnet: {
+    ...DefaultCustomTokensItem("phoenix-1"),
+    native: [
+      {
+        denom: "uluna",
+        id: "phoenix-1:uluna",
+      },
+      {
+        denom: "udungeon", // ✅ Dungeon native token
+        id: "dungeon-1:udungeon",
+      },
+    ],
+  },
 }
 
 export const DefaultSettings = {

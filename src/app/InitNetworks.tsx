@@ -45,17 +45,16 @@ const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
           return
         }
 
-        if (!chains.mainnet) chains.mainnet = {}
-        if (!chains.testnet) chains.testnet = {}
-        if (!chains.classic) chains.classic = {}
-        if (!chains.localterra) chains.localterra = {}
+        // Ensure all network groups exist
+        chains.mainnet = chains.mainnet || {}
+        chains.testnet = chains.testnet || {}
+        chains.classic = chains.classic || {}
+        chains.localterra = chains.localterra || {}
 
-        if (chains?.mainnet?.["noble-1"]) {
-          delete chains.mainnet["noble-1"]
-        }
-
-        console.log("Loaded chains.json", chains)
-        console.log("Has phoenix-1", chains?.mainnet?.["phoenix-1"])
+        // REMOVE this restriction (breaks adding new chains like Dungeon)
+        // if (chains?.mainnet?.["noble-1"]) {
+        //   delete chains.mainnet["noble-1"]
+        // }
 
         setNetworks(chains)
       } catch (error) {

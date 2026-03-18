@@ -59,8 +59,14 @@ interface VestingScheduleItem {
 }
 
 /* helpers */
-const getLunaAmount = (coins: Coin[]) =>
-  coins.find(({ denom }) => denom === "uluna")?.amount ?? "0"
+const getPrimaryAmount = (coins: Coin[]) => {
+  if (!coins?.length) return "0"
+  return (
+    coins.find(({ denom }) => denom === "uluna")?.amount ??
+    coins[0]?.amount ??
+    "0"
+  )
+}
 
 const getCurrentAmount = ({ start, end, amount }: VestingScheduleItem) => {
   if (!start) throw new Error("Start date is not defined")
@@ -83,7 +89,7 @@ const getVested = (schedule: VestingScheduleItem[]) =>
 
 /* parse */
 export const parseVestingSchedule = (
-  response: Account
+  response: Account,
 ): ParsedVestingSchedule => {
   if (response["@type"] === VestingAccountTypes.Continuous) {
     const { base_vesting_account, start_time } = response
@@ -92,8 +98,8 @@ export const parseVestingSchedule = (
     const start = new Date(Number(start_time) * 1000)
     const end = new Date(Number(end_time) * 1000)
     const toNow = isFuture(start) ? "future" : isPast(end) ? "past" : "now"
-    const amount = getLunaAmount(original_vesting)
-    const total = getLunaAmount(original_vesting)
+    const amount = getPrimaryAmount(original_vesting)
+    const total = getPrimaryAmount(original_vesting)
     const schedule = [{ start, end, toNow, amount } as const]
 
     return {
@@ -107,8 +113,8 @@ export const parseVestingSchedule = (
 
     const end = new Date(Number(end_time) * 1000)
     const toNow = isPast(end) ? "past" : "future"
-    const amount = getLunaAmount(original_vesting)
-    const total = getLunaAmount(original_vesting)
+    const amount = getPrimaryAmount(original_vesting)
+    const total = getPrimaryAmount(original_vesting)
     const schedule = [{ end, toNow, amount } as const]
 
     return {
@@ -121,18 +127,18 @@ export const parseVestingSchedule = (
   const { base_vesting_account, vesting_periods, start_time } = response
   const { original_vesting } = base_vesting_account
 
-  const total = getLunaAmount(original_vesting)
+  const total = getPrimaryAmount(original_vesting)
 
   const schedule = vesting_periods.reduce<VestingScheduleItem[]>(
     (acc, { length, amount: coins }) => {
       const start = last(acc)?.end ?? new Date(Number(start_time) * 1000)
       const end = new Date(start.getTime() + Number(length) * 1000)
       const toNow = isFuture(start) ? "future" : isPast(end) ? "past" : "now"
-      const amount = getLunaAmount(coins)
+      const amount = getPrimaryAmount(coins)
       const ratio = Number(amount) / Number(total)
       return [...acc, { start, end, toNow, amount, ratio }]
     },
-    []
+    [],
   )
 
   return {
@@ -147,7 +153,7 @@ export const queryAccounts = async (address: string, lcd: string) => {
   const path = "cosmos/auth/v1beta1/accounts"
   const { data } = await axios.get<{ account: Account }>(
     [path, address].join("/"),
-    { baseURL: lcd }
+    { baseURL: lcd },
   )
 
   return data.account

@@ -26,40 +26,37 @@ const DepositForm = () => {
   const readNativeDenom = useNativeDenoms()
 
   const bankBalance = useBankBalance()
+  const token = networks[chain]?.baseAsset ?? ""
+
   const balance =
-    bankBalance.find((b) => b.denom === networks[chain].baseAsset)?.amount ??
+    bankBalance.find((b) => b.chain === chain && b.denom === token)?.amount ??
     "0"
 
-  /* form */
   const form = useForm<TxValues>({ mode: "onChange" })
   const { register, trigger, watch, setValue, handleSubmit, formState } = form
   const { errors } = formState
   const { input } = watch()
-  const token = networks[chain].baseAsset
-  const decimals = readNativeDenom(token ?? "").decimals
+
+  const decimals = readNativeDenom(token, chain).decimals ?? 6
   const amount = toAmount(input, { decimals })
 
-  /* tx */
   const createTx = useCallback(
     ({ input }: TxValues) => {
-      if (!addresses) return
-      const amount = toAmount(input)
+      if (!addresses || !token) return
+
+      const amount = toAmount(input, { decimals })
       const msgs = [
-        new MsgDeposit(
-          Number(id),
-          addresses[chain],
-          amount + networks[chain].baseAsset
-        ),
+        new MsgDeposit(Number(id), addresses[chain], amount + token),
       ]
+
       return { msgs, chainID: chain }
     },
-    [addresses, id, chain, networks]
+    [addresses, id, chain, token, decimals],
   )
 
-  /* fee */
   const estimationTxValues = useMemo(
-    () => ({ input: toInput(balance) }),
-    [balance]
+    () => ({ input: toInput(balance, decimals) }),
+    [balance, decimals],
   )
 
   const onChangeMax = useCallback(
@@ -67,7 +64,7 @@ const DepositForm = () => {
       setValue("input", input)
       await trigger("input")
     },
-    [setValue, trigger]
+    [setValue, trigger],
   )
 
   const tx = {
@@ -93,13 +90,16 @@ const DepositForm = () => {
             <Input
               {...register("input", {
                 valueAsNumber: true,
-                validate: validate.input(toInput(max.amount), decimals),
+                validate: validate.input(
+                  toInput(max.amount, decimals),
+                  decimals,
+                ),
               })}
               token={token}
               onFocus={max.reset}
               type="number"
               inputMode="decimal"
-              placeholder={getPlaceholder()}
+              placeholder={getPlaceholder(decimals)}
               autoFocus
             />
           </FormItem>

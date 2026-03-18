@@ -7,17 +7,13 @@ import { Tag } from "components/display"
 export const ValidatorStatus = ({ status }: { status: BondStatus }) => {
   const { t } = useTranslation()
 
-  const color =
-    bondStatusFromJSON(BondStatus[status]) === BondStatus.BOND_STATUS_BONDED
-      ? "success"
-      : "warning"
+  const parsedStatus = bondStatusFromJSON(BondStatus[status])
+  const isBonded = parsedStatus === BondStatus.BOND_STATUS_BONDED
 
-  const label =
-    bondStatusFromJSON(BondStatus[status]) === BondStatus.BOND_STATUS_BONDED
-      ? t("Active")
-      : t("Inactive")
+  const color = isBonded ? "success" : "warning"
+  const label = isBonded ? t("Active") : t("Inactive")
 
-  return <Tag color={color}>{t(label)}</Tag>
+  return <Tag color={color}>{label}</Tag>
 }
 
 export const ValidatorJailed = () => {

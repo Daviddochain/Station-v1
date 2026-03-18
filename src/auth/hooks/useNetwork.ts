@@ -88,23 +88,26 @@ export const useNetwork = (): Record<ChainID, InterchainNetwork> => {
 
   // check connected wallet
   if (connectedWallet.status === WalletStatus.CONNECTED) {
-    if (network !== "mainnet" && "phoenix-1" in connectedWallet.network) {
+    const connectedChains = Object.keys(
+      (connectedWallet.network ?? {}) as Record<string, unknown>,
+    )
+
+    if (network !== "mainnet" && connectedChains.includes("phoenix-1")) {
       setNetwork("mainnet")
-    } else if (network !== "testnet" && "pisco-1" in connectedWallet.network) {
+    } else if (network !== "testnet" && connectedChains.includes("pisco-1")) {
       setNetwork("testnet")
     } else if (
       network !== "classic" &&
-      "columbus-5" in connectedWallet.network
+      connectedChains.includes("columbus-5")
     ) {
       setNetwork("classic")
     } else if (
       network !== "localterra" &&
-      "localterra" in connectedWallet.network
+      connectedChains.includes("localterra")
     ) {
       setNetwork("localterra")
     }
 
-    // Use our station-assets networks, not the wallet provider's embedded endpoints.
     return filterEnabledNetworks(getSelectedNetworks())
   }
 
@@ -145,6 +148,40 @@ export const useNetworkName = () => {
 
 export const useChainID = () => {
   const network = useRecoilValue(networkState)
+  const connectedWallet = useWallet()
+
+  if (connectedWallet.status === WalletStatus.CONNECTED) {
+    const connectedChains = Object.keys(
+      (connectedWallet.network ?? {}) as Record<string, unknown>,
+    )
+
+    if (network === "mainnet") {
+      if (connectedChains.length > 0) return connectedChains[0] as ChainID
+      return "phoenix-1"
+    }
+
+    if (network === "testnet") {
+      if (connectedChains.length > 0) return connectedChains[0] as ChainID
+      return "pisco-1"
+    }
+
+    if (network === "classic") {
+      if (connectedChains.includes("columbus-5")) return "columbus-5"
+      if (connectedChains.length > 0) return connectedChains[0] as ChainID
+      return "columbus-5"
+    }
+
+    if (network === "localterra") {
+      if (connectedChains.includes("localterra")) return "localterra"
+      if (connectedChains.length > 0) return connectedChains[0] as ChainID
+      return "localterra"
+    }
+
+    // ✅ NEW: support any custom chains like Dungeon automatically
+    if (connectedChains.length > 0) {
+      return connectedChains[0] as ChainID
+    }
+  }
 
   switch (network) {
     case "mainnet":

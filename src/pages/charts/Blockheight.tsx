@@ -29,26 +29,24 @@ const Blockheight = () => {
     [networks],
   )
 
-  const currentNetwork = allNetworks[chainID]
+  const currentNetwork = allNetworks?.[chainID]
   const lcd = currentNetwork?.lcd
 
   const { data, isLoading, error } = useQuery(
     ["blockheight", chainID, lcd],
     async () => {
-      if (!lcd) {
-        throw new Error("No LCD endpoint found for selected chain")
-      }
+      if (!lcd) throw new Error("No LCD endpoint found")
 
       const base = lcd.replace(/\/$/, "")
       const url = `${base}/cosmos/base/tendermint/v1beta1/blocks/latest`
 
       const response = await axios.get<LatestBlockResponse>(url)
-      return response.data?.block?.header?.height || "Unknown"
+      return response.data?.block?.header?.height ?? "Unknown"
     },
     {
-      enabled: !!lcd,
-
+      enabled: !!lcd && !!chainID,
       retry: 1,
+      refetchInterval: 6000, // keep it live
     },
   )
 

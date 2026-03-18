@@ -20,15 +20,18 @@ const ValidatorActions = ({ destination }: { destination: ValAddress }) => {
   const { t } = useTranslation()
   const currency = useCurrency()
   const networks = useNetworkWithFeature(ChainFeature.STAKING)
+
   const chain = useMemo(() => {
     const prefix = ValAddress.getPrefix(destination)
     return Object.values(networks).find(({ prefix: p }) => p === prefix)
   }, [networks, destination])
+
   const { data: delegation, ...delegationState } = useDelegation(destination)
   const { data: delegations, ...delegationsState } = useDelegations(
-    chain?.chainID ?? ""
+    chain?.chainID ?? "",
   )
-  const { data: rewards, ...rewardsState } = useRewards()
+  const { data: rewards, ...rewardsState } = useRewards(chain?.chainID)
+
   const state = combineState(delegationState, delegationsState)
   const calcValue = useMemoizedCalcValue()
 

@@ -22,30 +22,21 @@ const Coins = () => {
             <FormError>{t("Coins required to post transactions")}</FormError>
           )}
 
-          {/*
-            TODO: Same thing with Coingecko data
-          isClassic && (
-            <Flex className={styles.select}>
-              {!isWalletEmpty && <SelectMinimumValue />}
-            </Flex>
-          )
-          */}
-
           <section>
-            {coins.map(({ denom, chain, ...item }) => (
-              <Asset
-                chains={[]}
-                denom={denom}
-                {...readNativeDenom(denom, chain)}
-                {...item}
-                id={[
-                  // @ts-expect-error
-                  readNativeDenom(denom, chain)?.chainID ?? chain,
-                  denom,
-                ].join(":")}
-                key={denom}
-              />
-            ))}
+            {coins.map(({ denom, chain, amount }) => {
+              const tokenData = readNativeDenom(denom, chain)
+
+              return (
+                <Asset
+                  chains={[chain]}
+                  denom={denom}
+                  balance={amount}
+                  {...tokenData}
+                  id={[chain, denom].join(":")}
+                  key={[chain, denom].join(":")}
+                />
+              )
+            })}
           </section>
         </Grid>
       </>

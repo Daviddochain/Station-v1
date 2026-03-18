@@ -5,7 +5,7 @@ import BigNumber from "bignumber.js"
 import { ValAddress, Validator } from "@terra-money/feather.js"
 import { TerraValidator } from "types/validator"
 import { TerraProposalItem } from "types/proposal"
-import { useNetwork, useNetworkName } from "data/wallet"
+import { useNetwork, useChainID } from "data/wallet"
 import { queryKey, RefetchOptions } from "../query"
 import { useValidators } from "data/queries/staking"
 
@@ -26,10 +26,16 @@ export enum AggregateWallets {
 }
 
 export const useTerraAPIURL = () => {
-  const network = useNetworkName()
-  return network !== "mainnet"
-    ? "https://pisco-api.terra.dev"
-    : "https://phoenix-api.terra.dev"
+  const chainID = useChainID()
+
+  switch (chainID) {
+    case "phoenix-1":
+      return "https://phoenix-api.terra.dev"
+    case "pisco-1":
+      return "https://pisco-api.terra.dev"
+    default:
+      return ""
+  }
 }
 
 export const useIsTerraAPIAvailable = () => {
@@ -40,12 +46,12 @@ export const useIsTerraAPIAvailable = () => {
 export const useTerraAPI = <T>(path: string, params?: object, fallback?: T) => {
   const baseURL = useTerraAPIURL()
   const available = useIsTerraAPIAvailable()
-  const shouldFallback = !available && fallback
+  const shouldFallback = !available && fallback !== undefined
 
   return useQuery<T, AxiosError>(
     [queryKey.TerraAPI, baseURL, path, params],
     async () => {
-      if (shouldFallback) return fallback
+      if (shouldFallback) return fallback as T
       const { data } = await axios.get(path, { baseURL, params })
       return data
     },
@@ -57,8 +63,7 @@ export const useTerraAPI = <T>(path: string, params?: object, fallback?: T) => {
 export type GasPrices = Record<Denom, Amount>
 
 export const useGasPrices = () => {
-  const current = useTerraAPIURL()
-  const baseURL = current
+  const baseURL = useTerraAPIURL()
   const path = "/gas-prices"
 
   return useQuery(

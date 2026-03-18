@@ -24,15 +24,15 @@ import { useIBCChannels, useWhitelist } from "data/queries/chains"
 import CheckIcon from "@mui/icons-material/Check"
 import ClearIcon from "@mui/icons-material/Clear"
 import { getChainIDFromAddress } from "utils/bech32"
-import { useNetwork, useNetworkName } from "data/wallet"
+import { useChainID, useNetwork, useNetworkName } from "data/wallet"
 import { queryKey } from "data/query"
 import Tx from "txs/Tx"
 
 interface TxValues {
   asset: string
   chain?: string
-  destinationChain?: string // chainID
-  address?: AccAddress // hidden input
+  destinationChain?: string
+  address?: AccAddress
   input?: number
   decimals: number
 }
@@ -49,6 +49,7 @@ interface AssetType {
 const TransferPage = () => {
   const addresses = useInterchainAddresses()
   const networks = useNetwork()
+  const activeChainID = useChainID()
   const { getIBCChannel, getICSContract } = useIBCChannels()
   const { ibcDenoms } = useWhitelist()
   const networkName = useNetworkName()
@@ -59,39 +60,44 @@ const TransferPage = () => {
   const { route } = useWalletRoute() as unknown as {
     route: { denom?: string }
   }
+
   const availableAssets = useMemo(
     () =>
       Object.values(
-        (balances ?? []).reduce((acc, { denom, amount, chain }) => {
-          const data = readNativeDenom(denom)
-          if (acc[data.token]) {
-            acc[data.token].balance = `${
-              parseInt(acc[data.token].balance) + parseInt(amount)
-            }`
-            acc[data.token].chains.push(chain)
-            return acc as Record<string, AssetType>
-          } else {
-            return {
-              ...acc,
-              [data.token]: {
-                denom: data.token,
-                balance: amount,
-                icon: data.icon,
-                symbol: data.symbol,
-                price: prices?.[data.token]?.price ?? 0,
-                chains: [chain],
-              },
-            } as Record<string, AssetType>
-          }
-        }, {} as Record<string, AssetType>) ?? {}
-      ).sort(
-        (a, b) => b.price * parseInt(b.balance) - a.price * parseInt(a.balance)
-      ),
-    [balances, readNativeDenom, prices]
-  )
-  const defaultAsset = route?.denom || availableAssets[0].denom
+        (balances ?? []).reduce(
+          (acc, { denom, amount, chain }) => {
+            const data = readNativeDenom(denom, chain)
 
-  /* form */
+            if (acc[data.token]) {
+              acc[data.token].balance = `${
+                parseInt(acc[data.token].balance) + parseInt(amount)
+              }`
+              acc[data.token].chains.push(chain)
+              return acc as Record<string, AssetType>
+            } else {
+              return {
+                ...acc,
+                [data.token]: {
+                  denom: data.token,
+                  balance: amount,
+                  icon: data.icon,
+                  symbol: data.symbol,
+                  price: prices?.[data.token]?.price ?? 0,
+                  chains: [chain],
+                },
+              } as Record<string, AssetType>
+            }
+          },
+          {} as Record<string, AssetType>,
+        ) ?? {},
+      ).sort(
+        (a, b) => b.price * parseInt(b.balance) - a.price * parseInt(a.balance),
+      ),
+    [balances, readNativeDenom, prices],
+  )
+
+  const defaultAsset = route?.denom || availableAssets[0]?.denom || ""
+
   const form = useForm<TxValues>({ mode: "onChange" })
   const { register, trigger, watch, setValue, handleSubmit } = form
   const { formState } = form
@@ -104,7 +110,9 @@ const TransferPage = () => {
     address: destinationAddress,
     asset,
   } = watch()
+
   const amount = toAmount(input, { decimals })
+
   const availableChains = useMemo(
     () =>
       availableAssets
@@ -114,7 +122,7 @@ const TransferPage = () => {
           if (networks[b]?.prefix === "terra") return 1
           return 0
         }),
-    [asset, availableAssets, defaultAsset, networks]
+    [asset, availableAssets, defaultAsset, networks],
   )
 
   const availableDestinations = useMemo(
@@ -126,13 +134,13 @@ const TransferPage = () => {
           if (networks[b]?.prefix === "terra") return 1
           return 0
         }),
-    [networks, availableChains, chain] // eslint-disable-line
+    [networks, chain],
   )
 
   const token = balances.find(
-    ({ denom, chain }) =>
-      chain === watch("chain") &&
-      readNativeDenom(denom).token === watch("asset")
+    ({ denom, chain: balanceChain }) =>
+      balanceChain === watch("chain") &&
+      readNativeDenom(denom, balanceChain).token === watch("asset"),
   )
 
   const { ibc: ibcValidation } = validate.ibc(
@@ -140,10 +148,9 @@ const TransferPage = () => {
     chain ?? "",
     token?.denom ?? "",
     getIBCChannel,
-    readNativeDenom(token?.denom ?? "").isAxelar
+    readNativeDenom(token?.denom ?? "", chain).isAxelar,
   )
 
-  /* resolve recipient */
   useEffect(() => {
     if (!destinationChain || !addresses) {
       setValue("address", undefined)
@@ -158,22 +165,20 @@ const TransferPage = () => {
       }
       form.setFocus("input")
     }
-  }, [destinationChain, asset, chain]) // eslint-disable-line
+  }, [destinationChain, asset, chain, addresses, form, ibcValidation, setValue])
 
-  /* resolve source chain */
   useEffect(() => {
     if (availableChains?.length) {
       setValue("chain", availableChains[0])
     }
-  }, [asset]) // eslint-disable-line
+  }, [availableChains, setValue])
 
   useEffect(() => {
     if (availableDestinations?.length) {
       setValue("destinationChain", availableDestinations[0])
     }
-  }, [chain]) // eslint-disable-line
+  }, [availableDestinations, setValue])
 
-  /* render detected destination chain */
   function renderDestinationChain() {
     if (
       !chain ||
@@ -193,9 +198,9 @@ const TransferPage = () => {
         to: destinationChain,
         tokenAddress: token.denom,
         icsChannel:
-          ibcDenoms[networkName][`${chain}:${token.denom}`]?.icsChannel,
+          ibcDenoms[networkName]?.[`${chain}:${token.denom}`]?.icsChannel,
       }) &&
-        !readNativeDenom(token.denom).isAxelar)
+        !readNativeDenom(token.denom, chain).isAxelar)
     ) {
       return (
         <span className={styles.destination}>
@@ -219,14 +224,13 @@ const TransferPage = () => {
     }
   }
 
-  /* tx */
   const createTx = useCallback(
     ({ address, input }: TxValues) => {
       if (!addresses) return
       if (!(address && AccAddress.validate(address))) return
+
       const amount = toAmount(input, { decimals })
       const execute_msg = { transfer: { recipient: address, amount } }
-
       const destinationChain = getChainIDFromAddress(address, networks)
 
       if (!chain || !destinationChain || !token) return
@@ -237,14 +241,14 @@ const TransferPage = () => {
               new MsgSend(
                 addresses[token?.chain ?? ""],
                 address,
-                amount + token?.denom
+                amount + token?.denom,
               ),
             ]
           : [
               new MsgExecuteContract(
                 addresses[token?.chain ?? ""],
                 token?.denom ?? "",
-                execute_msg
+                execute_msg,
               ),
             ]
 
@@ -255,8 +259,9 @@ const TransferPage = () => {
           to: destinationChain,
           tokenAddress: token.denom,
           icsChannel:
-            ibcDenoms[networkName][`${chain}:${token.denom}`]?.icsChannel,
+            ibcDenoms[networkName]?.[`${chain}:${token.denom}`]?.icsChannel,
         })
+
         if (!channel) throw new Error("No IBC channel found")
 
         const msgs = AccAddress.validate(token?.denom ?? "")
@@ -276,10 +281,10 @@ const TransferPage = () => {
                       JSON.stringify({
                         channel,
                         remote_address: address,
-                      })
+                      }),
                     ).toString("base64"),
                   },
-                }
+                },
               ),
             ]
           : [
@@ -291,7 +296,7 @@ const TransferPage = () => {
                 address,
                 undefined,
                 (Date.now() + 120 * 1000) * 1e6,
-                undefined
+                undefined,
               ),
             ]
 
@@ -308,7 +313,7 @@ const TransferPage = () => {
       ibcDenoms,
       networkName,
       token,
-    ]
+    ],
   )
 
   const onChangeMax = useCallback(
@@ -316,17 +321,18 @@ const TransferPage = () => {
       setValue("input", input)
       await trigger("input")
     },
-    [setValue, trigger]
+    [setValue, trigger],
   )
 
-  /* fee */
   const coins = [{ input, denom: "" }] as CoinInput[]
+
   const estimationTxValues = useMemo(() => {
+    const estimationChain = chain ?? activeChainID ?? availableChains?.[0] ?? ""
     return {
-      address: addresses?.[chain ?? "phoenix-1"],
+      address: estimationChain ? addresses?.[estimationChain] : undefined,
       input: toInput(1, decimals),
     }
-  }, [addresses, decimals, chain])
+  }, [addresses, decimals, chain, activeChainID, availableChains])
 
   const tx = {
     token: token?.denom ?? "",
@@ -365,10 +371,13 @@ const TransferPage = () => {
                   autoFocus
                 >
                   {availableAssets.map(({ denom, symbol }) => (
-                    <option value={denom}>{symbol}</option>
+                    <option key={denom} value={denom}>
+                      {symbol}
+                    </option>
                   ))}
                 </Select>
               </FormItem>
+
               {availableChains && (
                 <FormItem label={t("Source chain")}>
                   <ChainSelector
@@ -378,6 +387,7 @@ const TransferPage = () => {
                   />
                 </FormItem>
               )}
+
               {destinationChain && (
                 <FormItem
                   label={t("Destination chain")}
@@ -398,7 +408,7 @@ const TransferPage = () => {
                           chain ?? "",
                           token?.denom ?? "",
                           getIBCChannel,
-                          readNativeDenom(token?.denom ?? "").isAxelar
+                          readNativeDenom(token?.denom ?? "", chain).isAxelar,
                         ),
                       },
                     })}
@@ -418,7 +428,7 @@ const TransferPage = () => {
                     valueAsNumber: true,
                     validate: validate.input(
                       toInput(max.amount, decimals),
-                      decimals
+                      decimals,
                     ),
                   })}
                   token={asset}
@@ -432,6 +442,7 @@ const TransferPage = () => {
               {fee.render()}
             </div>
           </section>
+
           <section className={styles.actions}>{submit.button}</section>
         </Form>
       )}

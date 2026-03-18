@@ -51,8 +51,8 @@ const NetWorth = () => {
   const sendButtonDisabled = !!isWalletEmpty && availableGasDenoms.length > 0
 
   const coinsValue =
-    coins?.reduce((acc, { amount, denom }) => {
-      const nativeDenom = readNativeDenom(denom)
+    coins?.reduce((acc, { amount, denom, chain }) => {
+      const nativeDenom = readNativeDenom(denom, chain)
 
       const token = nativeDenom?.token ?? denom
       const decimals = nativeDenom?.decimals ?? 6
@@ -66,7 +66,8 @@ const NetWorth = () => {
             ? (prices?.["uluna:phoenix"]?.price ?? prices?.luna2?.price ?? 0)
             : symbol?.endsWith("...")
               ? 0
-              : (prices?.[denom]?.price ??
+              : (prices?.[`${chain}:${denom}`]?.price ??
+                prices?.[denom]?.price ??
                 prices?.[token]?.price ??
                 prices?.[symbol?.toLowerCase?.() ?? ""]?.price ??
                 prices?.[`${denom}:classic`]?.price ??

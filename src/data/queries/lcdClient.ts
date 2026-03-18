@@ -36,6 +36,7 @@ export const useLCDClient = () => {
 
     return new LCDClient({
       ...selected,
+      chainID: selected.chainID,
       URL: selected.lcd,
     })
   }, [network, chainID])

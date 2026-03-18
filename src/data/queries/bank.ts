@@ -36,6 +36,8 @@ const isAllowedBrowserLCDHost = (hostname: string) => {
     host.includes("terra.dev") ||
     host.includes("lunaclassicstation.com") ||
     host.includes("terra-classic") ||
+    host.includes("dungeongames.io") ||
+    host.includes("quasarstaking.ai") ||
     host.includes("localhost") ||
     host === "127.0.0.1" ||
     host === "0.0.0.0"

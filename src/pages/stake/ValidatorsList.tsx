@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react"
+import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { readPercent } from "@terra-money/terra-utils"
@@ -30,12 +30,6 @@ const ValidatorsList = ({
 
   const { data: validators, ...validatorsState } = useValidators(chainID)
 
-  useEffect(() => {
-    console.log("ValidatorsList chainID:", chainID)
-    console.log("ValidatorsList validators raw:", validators)
-    console.log("ValidatorsList validatorsState:", validatorsState)
-  }, [chainID, validators, validatorsState])
-
   const state = combineState(validatorsState)
 
   const activeValidators = useMemo(() => {
@@ -44,7 +38,7 @@ const ValidatorsList = ({
     const priorityVals = getPriorityVals(validators)
     const calcRate = getCalcVotingPowerRate(validators)
 
-    const filtered = validators
+    return validators
       .filter((validator) => {
         if (keyword) return true
 
@@ -68,9 +62,6 @@ const ValidatorsList = ({
         }
       })
       .sort((a, b) => b.rank - a.rank)
-
-    console.log("ValidatorsList activeValidators:", filtered)
-    return filtered
   }, [validators, keyword])
 
   if (!activeValidators.length) {

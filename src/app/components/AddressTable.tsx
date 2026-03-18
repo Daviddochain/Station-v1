@@ -11,13 +11,16 @@ import AddressBox from "components/form/AddressBox"
 import { useBankBalance } from "data/queries/bank"
 
 interface Props {
-  finderLink?: boolean // either display finder link if true or AddressBox comp
+  finderLink?: boolean
   className?: string
 }
 
 const AddressTable = (props: Props) => {
   const { finderLink, className } = props
-  const addresses = useInterchainAddresses() as { [key: string]: AccAddress }
+  const addresses = useInterchainAddresses() as {
+    [key: string]: AccAddress
+  }
+
   const isConnected = useAddress()
   const networks = useNetwork()
   const { t } = useTranslation()
@@ -31,13 +34,28 @@ const AddressTable = (props: Props) => {
 
   if (!isConnected) return <NotConnected />
 
-  const addressData = Object.keys(addresses)
-    .map((key) => ({
-      address: addresses?.[key],
-      chainName: getChainNamefromID(key, networks) ?? key,
-      id: key,
-    }))
-    .sort((a) => (coins.some(({ chain }) => chain === a.id) ? -1 : 1))
+  // ✅ Build address list safely
+  const addressData = Object.keys(addresses ?? {})
+    .map((key) => {
+      const network = networks?.[key]
+
+      return {
+        address: addresses[key],
+        chainName: getChainNamefromID(key, networks) ?? key,
+        id: key,
+        hasBalance: coins.some(({ chain }) => chain === key),
+        icon: network?.icon,
+        baseAsset: network?.baseAsset,
+      }
+    })
+    .sort((a, b) => {
+      // ✅ First: chains WITH balance
+      if (a.hasBalance && !b.hasBalance) return -1
+      if (!a.hasBalance && b.hasBalance) return 1
+
+      // ✅ Then alphabetical
+      return a.chainName.localeCompare(b.chainName)
+    })
 
   return (
     <WithSearchInput
@@ -53,20 +71,15 @@ const AddressTable = (props: Props) => {
           dataSource={addressData}
           filter={({ chainName }) => {
             if (!keyword) return true
-            if (chainName.toLowerCase().includes(keyword.toLowerCase()))
-              return true
-            return false
+            return chainName.toLowerCase().includes(keyword.toLowerCase())
           }}
           columns={[
             {
               dataIndex: "chainName",
               align: "left",
-              render: (chainName: string, { id }) => (
+              render: (_: string, { id, chainName, icon, baseAsset }) => (
                 <div className={styles.chain}>
-                  <TokenIcon
-                    token={networks[id]?.baseAsset}
-                    icon={networks[id]?.icon}
-                  />
+                  <TokenIcon token={baseAsset} icon={icon} />
                   <div className={styles.name}>{chainName}</div>
                 </div>
               ),
