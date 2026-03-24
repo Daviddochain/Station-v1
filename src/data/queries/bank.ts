@@ -67,7 +67,7 @@ const normalizeCoins = (bal: any) => {
   return bal?.toArray?.() ?? []
 }
 
-const fetchClassicBankBalances = async (lcd: string, address: string) => {
+const fetchBankBalances = async (lcd: string, address: string) => {
   const { data } = await axios.get<{
     balances?: Array<{ denom: string; amount: string }>
   }>(`/cosmos/bank/v1beta1/balances/${address}`, {
@@ -101,15 +101,7 @@ export const useInitialTokenBalance = () => {
       return {
         queryKey: [queryKey.bank.balances, token, chainID, address],
         queryFn: async () => {
-          if (!address) {
-            return {
-              amount: "0",
-              denom: token,
-              chain: chainID ?? "",
-            } as CoinBalance
-          }
-
-          if (!enabled) {
+          if (!address || !enabled) {
             return {
               amount: "0",
               denom: token,
@@ -142,7 +134,6 @@ export const [useBankBalance, BankBalanceProvider] =
   createContext<CoinBalance[]>("useBankBalance")
 
 export const useInitialBankBalance = () => {
-  const lcd = useInterchainLCDClient()
   const addresses = useInterchainAddresses()
   const networks = useNetwork()
 
@@ -157,25 +148,11 @@ export const useInitialBankBalance = () => {
         queryFn: async () => {
           if (!enabled || !network?.lcd) return [] as CoinBalance[]
 
-          if (chainID === "columbus-5") {
-            const coins = await fetchClassicBankBalances(network.lcd, address)
+          const coins = await fetchBankBalances(network.lcd, address)
 
-            return coins.map(({ denom, amount }) => ({
-              denom,
-              amount,
-              chain: chainID,
-            })) as CoinBalance[]
-          }
-
-          const bal = ["phoenix-1", "pisco-1"].includes(chainID)
-            ? await lcd.bank.spendableBalances(address)
-            : await lcd.bank.balance(address)
-
-          const coins = normalizeCoins(bal)
-
-          return coins.map(({ denom, amount }: any) => ({
+          return coins.map(({ denom, amount }) => ({
             denom,
-            amount: amount.toString(),
+            amount,
             chain: chainID,
           })) as CoinBalance[]
         },
@@ -190,7 +167,6 @@ export const useInitialBankBalance = () => {
 
 export const useBalances = () => {
   const addresses = useInterchainAddresses()
-  const lcd = useInterchainLCDClient()
   const networks = useNetwork()
 
   return useQuery(
@@ -211,34 +187,15 @@ export const useBalances = () => {
           const address = addresses[chain]
           const network = networks?.[chain]
 
-          if (chain === "columbus-5" && network?.lcd) {
-            return await fetchClassicBankBalances(network.lcd, address)
-          }
-
-          return ["phoenix-1", "pisco-1"].includes(chain)
-            ? await lcd.bank.spendableBalances(address)
-            : await lcd.bank.balance(address)
+          if (!network?.lcd) return []
+          return await fetchBankBalances(network.lcd, address)
         }),
       )
 
       const result = [] as CoinBalance[]
 
       eligibleChains.forEach((chain, i) => {
-        if (chain === "columbus-5") {
-          const coins = Array.isArray(balances[i]) ? balances[i] : []
-
-          coins.forEach(({ denom, amount }: any) =>
-            result.push({
-              denom,
-              amount: amount.toString(),
-              chain,
-            }),
-          )
-
-          return
-        }
-
-        const coins = normalizeCoins(balances[i])
+        const coins = Array.isArray(balances[i]) ? balances[i] : []
 
         coins.forEach(({ denom, amount }: any) =>
           result.push({

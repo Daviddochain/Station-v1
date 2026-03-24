@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next"
-import { AccAddress, Validator, ValAddress } from "@terra-money/feather.js"
+import { AccAddress, Validator } from "@terra-money/feather.js"
 import { FinderLink } from "components/general"
 import { Card, Grid } from "components/layout"
 import { ValidatorNumber } from "./components/ValidatorNumbers"
@@ -9,11 +9,7 @@ const ValidatorAddresses = ({ validator }: { validator: Validator }) => {
   const { t } = useTranslation()
 
   const { operator_address } = validator
-
-  // ✅ FIX: derive correct prefix for ANY chain (LUNC, LUNA, Dungeon, etc.)
-  const walletAddress = AccAddress.fromValAddress(
-    ValAddress.fromString(operator_address),
-  )
+  const walletAddress = AccAddress.fromValAddress(operator_address)
 
   const addresses = [
     {

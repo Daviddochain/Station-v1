@@ -3,8 +3,6 @@ import { NavLink, useLocation } from "react-router-dom"
 import { useRecoilState, useSetRecoilState } from "recoil"
 import classNames from "classnames/bind"
 import CloseIcon from "@mui/icons-material/Close"
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown"
-import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight"
 import { mobileIsMenuOpenState } from "components/layout"
 import { useNav } from "../routes"
 import styles from "./Nav.module.scss"
@@ -90,6 +88,14 @@ const ChainIcon = ({ chain }: ChainIconProps) => {
   )
 }
 
+const CHAIN_LABELS: Record<string, string> = {
+  "columbus-5": "LUNC",
+  "phoenix-1": "LUNA",
+  "dungeon-1": "Dungeon",
+}
+
+const CHAIN_ORDER = ["columbus-5", "phoenix-1", "dungeon-1"]
+
 const Nav = () => {
   useCloseMenuOnNavigate()
 
@@ -102,90 +108,31 @@ const Nav = () => {
   const { selectedDisplayChain, changeSelectedDisplayChain } =
     useSelectedDisplayChain()
 
-  const [openGroups, setOpenGroups] = useState({
-    classic: true,
-    mainnet: false,
-    testnet: false,
-    localterra: false,
-  })
-
-  const classicNetworks = useMemo(
-    () => Object.values(networks?.classic ?? {}) as InterchainNetwork[],
+  const allNetworks = useMemo(
+    () =>
+      [
+        ...Object.values(networks?.classic ?? {}),
+        ...Object.values(networks?.mainnet ?? {}),
+        ...Object.values(networks?.testnet ?? {}),
+        ...Object.values(networks?.localterra ?? {}),
+      ] as InterchainNetwork[],
     [networks],
   )
 
-  const mainnetNetworks = useMemo(
-    () => Object.values(networks?.mainnet ?? {}) as InterchainNetwork[],
-    [networks],
-  )
+  const visibleNetworks = useMemo(() => {
+    const uniqueNetworks = allNetworks.filter(
+      (chain, index, arr) =>
+        arr.findIndex((item) => item.chainID === chain.chainID) === index,
+    )
 
-  const testnetNetworks = useMemo(
-    () => Object.values(networks?.testnet ?? {}) as InterchainNetwork[],
-    [networks],
-  )
-
-  const localterraNetworks = useMemo(
-    () => Object.values(networks?.localterra ?? {}) as InterchainNetwork[],
-    [networks],
-  )
+    return CHAIN_ORDER.map((chainID) =>
+      uniqueNetworks.find((chain) => chain.chainID === chainID),
+    ).filter(Boolean) as InterchainNetwork[]
+  }, [allNetworks])
 
   const handleSelectChain = (chainID: string) => {
     changeSelectedDisplayChain(chainID)
     close()
-  }
-
-  const toggleGroup = (
-    group: "classic" | "mainnet" | "testnet" | "localterra",
-  ) => {
-    setOpenGroups((prev) => ({
-      ...prev,
-      [group]: !prev[group],
-    }))
-  }
-
-  const renderNetworkGroup = (
-    key: "classic" | "mainnet" | "testnet" | "localterra",
-    title: string,
-    list: InterchainNetwork[] | undefined,
-  ) => {
-    if (!list?.length) return null
-
-    const isGroupOpen = openGroups[key]
-
-    return (
-      <div className={styles.networkGroup}>
-        <button
-          type="button"
-          className={styles.networkGroupHeader}
-          onClick={() => toggleGroup(key)}
-        >
-          <span>{title}</span>
-          {isGroupOpen ? (
-            <KeyboardArrowDownIcon fontSize="small" />
-          ) : (
-            <KeyboardArrowRightIcon fontSize="small" />
-          )}
-        </button>
-
-        {isGroupOpen && (
-          <div className={styles.networkGroupList}>
-            {list.map((chain) => (
-              <button
-                key={chain.chainID}
-                type="button"
-                onClick={() => handleSelectChain(chain.chainID)}
-                className={cx(styles.item, styles.link, styles.networkLink, {
-                  active: selectedDisplayChain === chain.chainID,
-                })}
-              >
-                <ChainIcon chain={chain} />
-                <span className={styles.networkName}>{chain.name}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    )
   }
 
   return (
@@ -220,10 +167,23 @@ const Nav = () => {
       <div className={styles.networksSection}>
         <div className={styles.networksTitle}>Networks</div>
 
-        {renderNetworkGroup("classic", "Terra Classic", classicNetworks)}
-        {renderNetworkGroup("mainnet", "Mainnets", mainnetNetworks)}
-        {renderNetworkGroup("testnet", "Testnets", testnetNetworks)}
-        {renderNetworkGroup("localterra", "LocalTerra", localterraNetworks)}
+        <div className={styles.networkGroupList}>
+          {visibleNetworks.map((chain) => (
+            <button
+              key={chain.chainID}
+              type="button"
+              onClick={() => handleSelectChain(chain.chainID)}
+              className={cx(styles.item, styles.link, styles.networkLink, {
+                active: selectedDisplayChain === chain.chainID,
+              })}
+            >
+              <ChainIcon chain={chain} />
+              <span className={styles.networkName}>
+                {CHAIN_LABELS[chain.chainID] || chain.name}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {name === "blossom" && (

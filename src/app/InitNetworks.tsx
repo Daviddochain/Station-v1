@@ -24,6 +24,35 @@ const emptyNetworks: InterchainNetworks = {
   localterra: {},
 }
 
+const ALLOWED_CHAIN_IDS = ["columbus-5", "phoenix-1", "dungeon-1"]
+
+const filterAllowedChains = (
+  chains: InterchainNetworks,
+): InterchainNetworks => {
+  return {
+    mainnet: Object.fromEntries(
+      Object.entries(chains.mainnet || {}).filter(([chainID]) =>
+        ALLOWED_CHAIN_IDS.includes(chainID),
+      ),
+    ),
+    testnet: Object.fromEntries(
+      Object.entries(chains.testnet || {}).filter(([chainID]) =>
+        ALLOWED_CHAIN_IDS.includes(chainID),
+      ),
+    ),
+    classic: Object.fromEntries(
+      Object.entries(chains.classic || {}).filter(([chainID]) =>
+        ALLOWED_CHAIN_IDS.includes(chainID),
+      ),
+    ),
+    localterra: Object.fromEntries(
+      Object.entries(chains.localterra || {}).filter(([chainID]) =>
+        ALLOWED_CHAIN_IDS.includes(chainID),
+      ),
+    ),
+  }
+}
+
 const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
   const [networks, setNetworks] = useState<InterchainNetworks>()
   const { customLCDs } = useCustomLCDs()
@@ -45,18 +74,14 @@ const InitNetworks = ({ children }: PropsWithChildren<{}>) => {
           return
         }
 
-        // Ensure all network groups exist
         chains.mainnet = chains.mainnet || {}
         chains.testnet = chains.testnet || {}
         chains.classic = chains.classic || {}
         chains.localterra = chains.localterra || {}
 
-        // REMOVE this restriction (breaks adding new chains like Dungeon)
-        // if (chains?.mainnet?.["noble-1"]) {
-        //   delete chains.mainnet["noble-1"]
-        // }
+        const filteredChains = filterAllowedChains(chains)
 
-        setNetworks(chains)
+        setNetworks(filteredChains)
       } catch (error) {
         console.error("Failed to fetch chains.json", {
           error,

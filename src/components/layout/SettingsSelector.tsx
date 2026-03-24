@@ -1,13 +1,12 @@
-import { useState } from "react"
-import { useTranslation } from "react-i18next"
+import { useMemo } from "react"
 import { useNetworks } from "app/InitNetworks"
 import classNames from "classnames/bind"
-import { Tooltip } from "components/display"
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown"
 import Flex from "./Flex"
 import styles from "./SettingsSelector.module.scss"
+import { STATION_ASSETS } from "config/constants"
 
 const cx = classNames.bind(styles)
+
 interface Props {
   value: string
   options: { value: string; label: string }[]
@@ -16,82 +15,68 @@ interface Props {
   withToggle?: boolean
 }
 
-const SettingsSelector = ({
-  value,
-  options,
-  onChange,
-  withSearch,
-  withToggle,
-}: Props) => {
-  const { t } = useTranslation()
+const resolveIconSrc = (icon?: string) => {
+  if (!icon) return ""
 
-  const selected = value
-  const [openAcc, setOpenAcc] = useState(0)
-
-  const handleClick = (index: any, e: any) => {
-    e.stopPropagation()
-    setOpenAcc(index === openAcc ? 0 : index)
+  if (icon.startsWith("http://") || icon.startsWith("https://")) {
+    return icon
   }
 
+  if (icon.startsWith("/")) {
+    return `${STATION_ASSETS}${icon}`
+  }
+
+  return `${STATION_ASSETS}/${icon}`
+}
+
+const SettingsSelector = ({ value, options, onChange }: Props) => {
+  const selected = value
   const { networks } = useNetworks()
-  const networksOnSelection = networks[value] || {}
+
+  const allNetworks = useMemo(
+    () => ({
+      ...(networks?.mainnet ?? {}),
+      ...(networks?.classic ?? {}),
+      ...(networks?.testnet ?? {}),
+      ...(networks?.localterra ?? {}),
+    }),
+    [networks],
+  )
 
   return (
     <div className={styles.wrapper}>
       <section className={styles.selector}>
-        {options.map(({ value, label }, index) => (
-          <div
-            className={cx(
-              styles.accordion,
-              openAcc === index + 1 ? "opened" : ""
-            )}
-          >
-            <button
-              key={value}
-              className={styles.item}
-              onClick={() => onChange(value)}
-            >
-              <div className={styles.icons_container}>
-                <div>{label}</div>
-                {Object.keys(networksOnSelection ?? {}).length > 1 && (
-                  <Tooltip content={t("View active chains")}>
-                    <KeyboardArrowDownIcon
-                      className={styles.icon}
-                      onClick={(e) => handleClick(index + 1, e)}
-                    />
-                  </Tooltip>
-                )}
-              </div>
-              <Flex className={styles.track}>
-                <span
-                  className={cx(styles.indicator, {
-                    checked: selected === value,
-                  })}
-                />
-              </Flex>
-            </button>
-            <div
-              className={cx(
-                styles.content,
-                openAcc === index + 1 ? "opened" : ""
-              )}
-            >
-              {Object.keys(networksOnSelection ?? {}).length > 1 &&
-                Object.keys(networksOnSelection ?? {}).map((network: any) => (
-                  <div
-                    className={styles.network}
-                    key={networksOnSelection[network]?.chainID}
-                  >
-                    <img
-                      src={networksOnSelection[network].icon}
-                      alt={networksOnSelection[network].name}
-                    />
-                    {networksOnSelection[network].name}
+        {options.map(({ value, label }) => {
+          const network = allNetworks[value]
+          const iconSrc = resolveIconSrc(network?.icon)
+
+          return (
+            <div className={styles.accordion} key={value}>
+              <button
+                className={styles.item}
+                onClick={() => onChange(value)}
+                type="button"
+              >
+                <div className={styles.icons_container}>
+                  <div className={styles.network}>
+                    {iconSrc && (
+                      <img src={iconSrc} alt={network?.name ?? label} />
+                    )}
+                    {label}
                   </div>
-                ))}
+                </div>
+
+                <Flex className={styles.track}>
+                  <span
+                    className={cx(styles.indicator, {
+                      checked: selected === value,
+                    })}
+                  />
+                </Flex>
+              </button>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </section>
     </div>
   )

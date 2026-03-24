@@ -11,16 +11,16 @@ import CurrencySetting from "./CurrencySetting"
 import { useWallet, WalletStatus } from "@terra-money/wallet-kit"
 import { ModalButton } from "components/feedback"
 import SettingsButton from "components/layout/SettingsButton"
-import { useNetwork, useNetworkName } from "data/wallet"
+import { useNetwork } from "data/wallet"
 import { useCurrency } from "data/settings/Currency"
 import { Languages } from "config/lang"
 import { capitalize } from "@mui/material"
-import { ReactNode, useState, useEffect } from "react"
+import { ReactNode, useState, useEffect, useMemo } from "react"
 import styles from "./Preferences.module.scss"
 import SelectTheme from "./SelectTheme"
 import LCDSetting from "./LCDSetting"
 import { useTheme } from "data/settings/Theme"
-import { useDisplayChains } from "utils/localStorage"
+import { useDisplayChains, useSelectedDisplayChain } from "utils/localStorage"
 import { getDisplayChainsSettingLabel } from "data/queries/chains"
 import AdvancedSettings from "./AdvancedSettings"
 import { atom, useRecoilState } from "recoil"
@@ -48,6 +48,12 @@ export const displayChainPrefsOpen = atom({
   default: false,
 })
 
+const CHAIN_LABELS: Record<string, string> = {
+  "columbus-5": "LUNC",
+  "phoenix-1": "LUNA",
+  "dungeon-1": "Dungeon",
+}
+
 const Preferences = () => {
   const { t } = useTranslation()
   const connectedWallet = useWallet()
@@ -55,8 +61,8 @@ const Preferences = () => {
 
   const { i18n } = useTranslation()
   const { id: currencyId } = useCurrency()
-  const networkName = useNetworkName()
   const network = useNetwork()
+  const { selectedDisplayChain } = useSelectedDisplayChain()
   const { name } = useTheme()
   const { displayChains } = useDisplayChains()
   const [isOpen] = useRecoilState(displayChainPrefsOpen)
@@ -65,11 +71,23 @@ const Preferences = () => {
     if (isOpen) setPage("displayChains")
   }, [isOpen])
 
+  const selectedChainLabel = useMemo(() => {
+    if (selectedDisplayChain && CHAIN_LABELS[selectedDisplayChain]) {
+      return CHAIN_LABELS[selectedDisplayChain]
+    }
+
+    if (selectedDisplayChain && network?.[selectedDisplayChain]?.name) {
+      return network[selectedDisplayChain].name
+    }
+
+    return "LUNC"
+  }, [selectedDisplayChain, network])
+
   const routes: Record<Routes, SettingsPage> = {
     network: {
       key: "network",
       tab: t("Network"),
-      value: capitalize(networkName),
+      value: selectedChainLabel,
       disabled: !sandbox && connectedWallet.status === WalletStatus.CONNECTED,
     },
     lang: {
@@ -77,7 +95,7 @@ const Preferences = () => {
       tab: t("Language"),
       value:
         Object.values(Languages ?? {}).find(
-          ({ value }) => value === i18n.language
+          ({ value }) => value === i18n.language,
         )?.label ?? Languages.en.label,
       disabled: false,
     },
@@ -109,7 +127,7 @@ const Preferences = () => {
     lcd: {
       key: "lcd",
       tab: t("Custom LCD"),
-      disabled: true, // hide button on the main settings page
+      disabled: true,
     },
   }
 
