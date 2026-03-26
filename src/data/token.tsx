@@ -12,10 +12,27 @@ import {
 } from "./external/osmosis"
 import { useCW20Whitelist, useIBCWhitelist } from "./Terra/TerraAssets"
 import { useWhitelist } from "./queries/chains"
-import { useNetworkName, useNetwork } from "./wallet"
+import { useNetwork } from "./wallet"
 import { getChainIDFromAddress } from "utils/bech32"
 
 export const DEFAULT_NATIVE_DECIMALS = 6
+
+type NativeWhitelistItem = {
+  token: string
+  symbol: string
+  name: string
+  icon: string
+  chains: string[]
+  decimals: number
+  isAxelar?: boolean
+}
+
+type IBCDenomItem = {
+  token: string
+  chain: string
+  chainID?: string
+  icsChannel?: string
+}
 
 export const useTokenItem = (
   token: Token,
@@ -82,12 +99,11 @@ export enum TokenType {
 export const useNativeDenoms = () => {
   const { whitelist, ibcDenoms } = useWhitelist()
   const { list: cw20 } = useCustomTokensCW20()
-  const networkName = useNetworkName()
   const networks = useNetwork()
   const gammTokens = useGammTokens()
 
   function readNativeDenom(
-    denom = "",
+    denom: Denom = "",
     chainID?: string,
   ): TokenItem & { isNonWhitelisted?: boolean } {
     let decimals = DEFAULT_NATIVE_DECIMALS
@@ -117,7 +133,7 @@ export const useNativeDenoms = () => {
         fixedDenom = gammTokens.get(denom) ?? readDenom(denom)
         break
 
-      case TokenType.FACTORY:
+      case TokenType.FACTORY: {
         const factoryParts = denom.split(/[/:]/)
         let tokenAddress = ""
         if (factoryParts.length >= 2) {
@@ -125,6 +141,7 @@ export const useNativeDenoms = () => {
         }
         fixedDenom = tokenAddress
         break
+      }
 
       case TokenType.STRIDE:
         fixedDenom = `st${denom.replace("stu", "").toUpperCase()}`
@@ -134,7 +151,7 @@ export const useNativeDenoms = () => {
         fixedDenom = readDenom(denom) || denom
     }
 
-    let factoryIcon
+    let factoryIcon: string | undefined
     if (tokenType === TokenType.FACTORY) {
       const tokenAddress = denom.split(/[/:]/)[1]
       const derivedChainID = getChainIDFromAddress(tokenAddress, networks)
@@ -147,41 +164,48 @@ export const useNativeDenoms = () => {
       factoryIcon = OSMO_ICON
     }
 
-    // whitelist native
     if (chainID) {
       const tokenID = `${chainID}:${denom}`
-      if (whitelist[networkName]?.[tokenID])
-        return whitelist[networkName][tokenID]
+      const whitelistedToken = whitelist?.[tokenID] as
+        | NativeWhitelistItem
+        | undefined
+
+      if (whitelistedToken) {
+        return whitelistedToken as TokenItem & { isNonWhitelisted?: boolean }
+      }
     } else {
-      const tokenDetails = Object.values(whitelist[networkName] ?? {}).find(
-        ({ token }) => token === denom,
-      )
-      if (tokenDetails) return tokenDetails
+      const tokenDetails = Object.values(whitelist ?? {}).find(
+        (item) => item.token === denom,
+      ) as NativeWhitelistItem | undefined
+
+      if (tokenDetails) {
+        return tokenDetails as TokenItem & { isNonWhitelisted?: boolean }
+      }
     }
 
-    // ibc
-    let ibcToken = chainID
-      ? ibcDenoms[networkName]?.[`${chainID}:${denom}`]
-      : Object.entries(ibcDenoms[networkName] ?? {}).find(
-          ([k]) => k.split(":")[1] === denom,
-        )?.[1]
+    const ibcToken = (
+      chainID
+        ? ibcDenoms?.[`${chainID}:${denom}`]
+        : Object.entries(ibcDenoms ?? {}).find(
+            ([k]) => k.split(":")[1] === denom,
+          )?.[1]
+    ) as IBCDenomItem | undefined
 
     if (
       ibcToken &&
-      whitelist[networkName][ibcToken?.token] &&
-      (!chainID || ibcToken?.chainID === chainID)
+      whitelist?.[ibcToken.token] &&
+      (!chainID || ibcToken.chainID === chainID)
     ) {
       return {
-        ...whitelist[networkName][ibcToken.token],
+        ...(whitelist[ibcToken.token] as NativeWhitelistItem),
         type: tokenType,
         // @ts-expect-error
         chains: [ibcToken.chainID],
       }
     }
 
-    // Terra special handling
     if (denom === "uluna") {
-      if (chainID === "columbus-5" || (!chainID && networkName === "classic")) {
+      if (chainID === "columbus-5") {
         return {
           token: denom,
           symbol: "LUNC",

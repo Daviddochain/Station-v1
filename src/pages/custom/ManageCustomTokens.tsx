@@ -7,7 +7,6 @@ import { Fetching } from "components/feedback"
 import WithSearchInput from "./WithSearchInput"
 import TokenList from "./TokenList"
 import { useWhitelist } from "data/queries/chains"
-import { useNetworkName } from "data/wallet"
 
 interface Props {
   whitelist: { cw20: CW20Whitelist; native: NativeWhitelist }
@@ -27,7 +26,7 @@ const Component = ({ whitelist, keyword }: Props) => {
   const added = {
     cw20: cw20.list.reduce<AddedCW20>(
       (acc, item) => ({ ...acc, [item.token]: item }),
-      {}
+      {},
     ),
     native: native.list.reduce<AddedNative>((acc, item) => {
       const token = whitelist.native[item.denom]
@@ -46,17 +45,14 @@ const Component = ({ whitelist, keyword }: Props) => {
     ...added.cw20,
   }
 
-  // if listed
   const listedItem = merged[keyword]
 
-  // if not listed
   const { data: tokenInfo, ...state } = useTokenInfoCW20(
-    !listedItem ? keyword : ""
+    !listedItem ? keyword : "",
   )
 
   const responseItem = tokenInfo ? { token: keyword, ...tokenInfo } : undefined
 
-  // conclusion
   const result = listedItem ?? responseItem
 
   const results = AccAddress.validate(keyword)
@@ -66,7 +62,7 @@ const Component = ({ whitelist, keyword }: Props) => {
     : Object.values(merged ?? {}).filter((item) => {
         const { symbol, name } = item
         return [symbol, name].some((word) =>
-          word?.toLowerCase().includes(keyword.toLowerCase())
+          word?.toLowerCase().includes(keyword.toLowerCase()),
         )
       })
 
@@ -99,7 +95,6 @@ const Component = ({ whitelist, keyword }: Props) => {
   }
 
   const renderTokenItem = (item: CustomTokenCW20 | NativeTokenItem) => {
-    // TODO: distinguish native and cw20
     const { token, symbol, ...rest } = item
     return { ...rest, token, title: symbol, contract: token, key: token }
   }
@@ -117,14 +112,14 @@ const Component = ({ whitelist, keyword }: Props) => {
 const ManageCustomTokens = () => {
   const { data: cw20, ...cw20WhitelistState } = useCW20Whitelist()
   const { whitelist } = useWhitelist()
-  const networkName = useNetworkName()
 
   const render = () => {
     if (!cw20) return null
 
     const cw20Whitelist: CW20Whitelist = {}
     const nativeWhitelist: NativeWhitelist = {}
-    Object.entries(whitelist[networkName] ?? {}).forEach(([id, asset]) => {
+
+    Object.entries(whitelist ?? {}).forEach(([id, asset]) => {
       if (AccAddress.validate(asset.token)) {
         cw20Whitelist[asset.token] = asset
       } else {

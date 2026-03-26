@@ -2,7 +2,7 @@ import { atom, useRecoilState } from "recoil"
 import update from "immutability-helper"
 import { DefaultCustomTokensItem, SettingKey } from "utils/localStorage"
 import { getLocalSetting, setLocalSetting } from "utils/localStorage"
-import { useChainID, useNetworkName } from "../wallet"
+import { useChainID } from "../wallet"
 
 const customTokensState = atom({
   key: "customTokens",
@@ -16,19 +16,18 @@ interface Params<T> {
 
 const useCustomTokens = <T extends CustomToken>({ type, key }: Params<T>) => {
   const [customTokens, setCustomTokens] = useRecoilState(customTokensState)
-  const networkName = useNetworkName()
   const chainID = useChainID()
-  const list = (customTokens[networkName]?.[type] ?? []) as T[]
+  const list = (customTokens[chainID]?.[type] ?? []) as T[]
 
   const getIsAdded = (param: T) =>
     !!list.find((item) => item[key] === param[key])
 
   const updateList = (list: T[]) => {
     const prev = {
-      [networkName]: DefaultCustomTokensItem(chainID),
+      [chainID]: DefaultCustomTokensItem(chainID),
       ...customTokens,
     }
-    const next = update(prev, { [networkName]: { [type]: { $set: list } } })
+    const next = update(prev, { [chainID]: { [type]: { $set: list } } })
     setCustomTokens(next)
     setLocalSetting(SettingKey.CustomTokens, next)
   }

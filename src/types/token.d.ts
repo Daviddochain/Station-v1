@@ -47,6 +47,7 @@ interface TokenItemWithBalance extends TokenItem {
 interface CoinData {
   amount: Amount
   denom: Denom
+  chain?: string
 }
 
 /* ibc */

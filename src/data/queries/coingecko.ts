@@ -4,9 +4,7 @@ import { queryKey, RefetchOptions } from "../query"
 import { STATION_ASSETS, ASSETS } from "config/constants"
 import axios from "axios"
 import { useCurrency } from "data/settings/Currency"
-import { useChainID } from "data/wallet"
 
-// TODO: remove/move somewhere else
 export const useActiveDenoms = () => {
   return useQuery(
     [queryKey.coingecko.activeDenoms],
@@ -79,12 +77,6 @@ const queryStationAliases = async () => {
   }
 }
 
-const queryCoinGeckoPrices = async (): Promise<
-  Record<string, ExternalPrice>
-> => {
-  return {}
-}
-
 const normalizeExternalPrice = (entry?: {
   price?: number
   change?: number
@@ -130,8 +122,9 @@ const queryCMCPrices = async (): Promise<Record<string, ExternalPrice>> => {
     const mapped: Record<string, ExternalPrice> = {}
 
     Object.entries(data).forEach(([key, value]) => {
-      mapped[key] = normalizeExternalPrice(value)
-      mapped[key.toLowerCase()] = normalizeExternalPrice(value)
+      const normalized = normalizeExternalPrice(value)
+      mapped[key] = normalized
+      mapped[key.toLowerCase()] = normalized
     })
 
     addPriceAlias(
@@ -147,6 +140,11 @@ const queryCMCPrices = async (): Promise<Record<string, ExternalPrice>> => {
       normalizeExternalPrice(
         data["uluna:phoenix"] ?? data.uluna_phoenix ?? data.luna2 ?? data.luna,
       ),
+    )
+    addPriceAlias(
+      mapped,
+      "uusd",
+      normalizeExternalPrice(data.uusd ?? data.ustc),
     )
     addPriceAlias(
       mapped,
@@ -215,6 +213,16 @@ const queryCMCPrices = async (): Promise<Record<string, ExternalPrice>> => {
     addPriceAlias(mapped, "eth", normalizeExternalPrice(data.weth ?? data.eth))
     addPriceAlias(mapped, "btc", normalizeExternalPrice(data.wbtc ?? data.btc))
 
+    const dgnPrice = normalizeExternalPrice(
+      data.udgn ?? data.dgn ?? data.dungeon,
+    )
+    addPriceAlias(mapped, "dgn", dgnPrice)
+    addPriceAlias(mapped, "DGN", dgnPrice)
+    addPriceAlias(mapped, "udgn", dgnPrice)
+    addPriceAlias(mapped, "dungeon", dgnPrice)
+    addPriceAlias(mapped, "Dungeon", dgnPrice)
+    addPriceAlias(mapped, "dungeon-1:udgn", dgnPrice)
+
     return mapped
   } catch (error) {
     console.warn("Failed to load backend CoinMarketCap prices", error)
@@ -242,42 +250,21 @@ const queryFiatPrice = async (currencyId: string) => {
   }
 }
 
-const getUlunaPriceByChain = (
-  chainID: string | undefined,
-  prices: Record<string, ExternalPrice>,
-) => {
-  if (chainID === "columbus-5") {
-    return prices["uluna:classic"] ?? prices.lunc ?? { usd: 0, change24h: 0 }
-  }
-
-  if (chainID === "phoenix-1") {
-    return prices["uluna:phoenix"] ?? prices.luna2 ?? { usd: 0, change24h: 0 }
-  }
-
-  return prices.uluna ?? prices.lunc ?? prices.luna2 ?? { usd: 0, change24h: 0 }
-}
-
 export const useExchangeRates = () => {
   const currency = useCurrency()
-  const chainID = useChainID()
 
   return useQuery(
-    [queryKey.coingecko.exchangeRates, currency, chainID],
+    [queryKey.coingecko.exchangeRates, currency],
     async () => {
-      const [stationAliases, coinGeckoPrices, cmcPrices, fiatPrice] =
-        await Promise.all([
-          queryStationAliases(),
-          queryCoinGeckoPrices(),
-          queryCMCPrices(),
-          queryFiatPrice(currency.id),
-        ])
+      const [stationAliases, cmcPrices, fiatPrice] = await Promise.all([
+        queryStationAliases(),
+        queryCMCPrices(),
+        queryFiatPrice(currency.id),
+      ])
 
       const mergedPrices: Record<string, ExternalPrice> = {
-        ...coinGeckoPrices,
         ...cmcPrices,
       }
-
-      const activeUluna = getUlunaPriceByChain(chainID, mergedPrices)
 
       const priceObject: PriceObject = {}
 
@@ -297,13 +284,9 @@ export const useExchangeRates = () => {
       const ustcPrice = (mergedPrices.ustc?.usd ?? 0) * fiatPrice
       const ustcChange = mergedPrices.ustc?.change24h ?? 0
 
-      const activeUlunaPrice = (activeUluna.usd ?? 0) * fiatPrice
-      const activeUlunaChange = activeUluna.change24h ?? 0
-
-      priceObject.uluna = {
-        price: activeUlunaPrice,
-        change: activeUlunaChange,
-      }
+      const dgnUsd = mergedPrices.dgn?.usd ?? mergedPrices.udgn?.usd ?? 0
+      const dgnChange =
+        mergedPrices.dgn?.change24h ?? mergedPrices.udgn?.change24h ?? 0
 
       priceObject["uluna:classic"] = {
         price: luncPrice,
@@ -333,6 +316,26 @@ export const useExchangeRates = () => {
       priceObject.ustc = {
         price: ustcPrice,
         change: ustcChange,
+      }
+
+      priceObject.dgn = {
+        price: dgnUsd * fiatPrice,
+        change: dgnChange,
+      }
+
+      priceObject.DGN = {
+        price: dgnUsd * fiatPrice,
+        change: dgnChange,
+      }
+
+      priceObject.udgn = {
+        price: dgnUsd * fiatPrice,
+        change: dgnChange,
+      }
+
+      priceObject["dungeon-1:udgn"] = {
+        price: dgnUsd * fiatPrice,
+        change: dgnChange,
       }
 
       if (mergedPrices.uusdc) {
@@ -384,16 +387,32 @@ export const useExchangeRates = () => {
   )
 }
 
-/* helpers */
 export type CalcValue = (params: CoinData) => number | undefined
 
 export const useMemoizedCalcValue = () => {
   const { data: memoizedPrices } = useExchangeRates()
 
   return useCallback<CalcValue>(
-    ({ amount, denom }) => {
+    ({ amount, denom, chain }) => {
       if (!memoizedPrices) return
-      return Number(amount) * Number(memoizedPrices[denom]?.price ?? 0)
+
+      const chainSpecificKey =
+        denom === "uluna" && chain
+          ? chain === "columbus-5"
+            ? "uluna:classic"
+            : chain === "phoenix-1" || chain === "pisco-1"
+              ? "uluna:phoenix"
+              : denom
+          : `${chain}:${denom}`
+
+      return (
+        Number(amount) *
+        Number(
+          memoizedPrices[chainSpecificKey]?.price ??
+            memoizedPrices[denom]?.price ??
+            0,
+        )
+      )
     },
     [memoizedPrices],
   )
