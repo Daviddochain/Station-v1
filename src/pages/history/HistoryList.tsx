@@ -7,36 +7,97 @@ import { Card, Col, Page } from "components/layout"
 import { Empty } from "components/feedback"
 import HistoryItem from "./HistoryItem"
 import { useInterchainAddresses } from "auth/hooks/useAddress"
-import { isTerraChain } from "utils/chain"
 
 interface Props {
   chainID?: string
 }
 
-interface PaginationKeys {
-  limit: string
-  offset: string
-  reverse: string
+const NON_COSMOS_CHAIN_TYPES = new Set([
+  "bitcoin",
+  "btc",
+  "ethereum",
+  "eth",
+  "evm",
+  "solana",
+  "sol"
+])
+
+const HISTORY_UNSUPPORTED_LCD_HOSTS = new Set([
+  "api.carbon.network",
+  "query-api.carbon.network",
+  "lcd-axelar.tfl.foundation"
+])
+
+const isNonCosmosNetwork = (network?: any) => {
+  const chainType = String(network?.chainType ?? "").toLowerCase()
+
+  return (
+    NON_COSMOS_CHAIN_TYPES.has(chainType) ||
+    network?.chainID === "bitcoin-mainnet" ||
+    network?.chainID === "ethereum-mainnet" ||
+    network?.chainID === "solana-mainnet" ||
+    network?.prefix === "bc" ||
+    network?.prefix === "0x" ||
+    network?.prefix === "sol"
+  )
 }
 
-/**
- * Returns pagination keys for the given chain. Switched by cosmos_sdk
- * version in the future, isTerra for now.
- *
- * @param isTerra boolean based on chain-id.  True if Terra, false if not.
- */
-function getPaginationKeys(isTerra: boolean): PaginationKeys {
-  if (isTerra) {
+const getLCDHost = (lcd?: string) => {
+  if (!lcd) return undefined
+
+  try {
+    return new URL(lcd, window.location.origin).hostname
+  } catch {
+    return undefined
+  }
+}
+
+const isHistoryBlockedLCD = (lcd?: string) => {
+  const host = getLCDHost(lcd)
+  return !!host && HISTORY_UNSUPPORTED_LCD_HOSTS.has(host)
+}
+
+const canQueryHistory = (network: any, address?: string) => {
+  if (!network?.lcd || !address) return false
+  if (isNonCosmosNetwork(network)) return false
+  if (network.disabledModules?.includes("history")) return false
+  if (isHistoryBlockedLCD(network.lcd)) return false
+
+  try {
+    new URL(network.lcd, window.location.origin)
+  } catch {
+    return false
+  }
+
+  return true
+}
+
+const fetchHistoryEvent = async (
+  lcd: string,
+  event: string,
+  address: string,
+  limit: number
+) => {
+  const query = `${event}='${address}'`
+
+  try {
+    return await axios.get<AccountHistory>(`/cosmos/tx/v1beta1/txs`, {
+      baseURL: lcd,
+      params: {
+        query,
+        "pagination.limit": limit,
+        order_by: "ORDER_BY_DESC"
+      }
+    })
+  } catch {
     return {
-      limit: "limit",
-      offset: "page",
-      reverse: "orderBy",
-    }
-  } else {
-    return {
-      limit: "pagination.limit",
-      offset: "pagination.offset",
-      reverse: "pagination.reverse",
+      data: {
+        tx_responses: [],
+        pagination: {
+          next_key: null,
+          total: "0"
+        }
+      } as AccountHistory
     }
   }
 }
@@ -52,47 +113,41 @@ const HistoryList = ({ chainID }: Props) => {
     // any coin received
     "transfer.recipient",
     // any coin sent
-    "transfer.sender",
+    "transfer.sender"
   ]
 
   const historyData = useQueries(
     Object.keys(addresses ?? {})
       .filter((chain) => !chainID || chain === chainID)
+      .filter((chain) => canQueryHistory(networks?.[chain], addresses?.[chain]))
       .map((chain) => {
         const address = chain && addresses?.[chain]
 
-        const isTerra = isTerraChain(chain)
-
-        // return pagination keys by network.
-        const paginationKeys = getPaginationKeys(isTerra)
-
         return {
-          queryKey: [queryKey.History, networks?.[chain]?.lcd, address],
+          queryKey: [queryKey.History, chain, networks?.[chain]?.lcd, address],
           queryFn: async () => {
             const result: any[] = []
             const txhases: string[] = []
 
-            if (!networks?.[chain]?.lcd) {
+            if (!address || !canQueryHistory(networks?.[chain], address)) {
               return result
             }
 
+            const lcd = networks[chain].lcd
+
             const requests = await Promise.all(
-              EVENTS.map((event) => {
-                return axios.get<AccountHistory>(`/cosmos/tx/v1beta1/txs`, {
-                  baseURL: networks[chain].lcd,
-                  params: {
-                    events: `${event}='${address}'`,
-                    //order_by: "ORDER_BY_DESC",
-                    [paginationKeys.offset]: 0 || undefined,
-                    [paginationKeys.reverse]: isTerra ? 2 : true,
-                    [paginationKeys.limit]: LIMIT,
-                  },
-                })
-              })
+              EVENTS.map((event) =>
+                fetchHistoryEvent(lcd, event, address, LIMIT)
+              )
             )
 
-            for (const { data } of requests) {
-              data.tx_responses.forEach((tx) => {
+            for (const request of requests) {
+              const data = request?.data
+              const txResponses = Array.isArray(data?.tx_responses)
+                ? data.tx_responses
+                : []
+
+              txResponses.forEach((tx) => {
                 if (!txhases.includes(tx.txhash)) {
                   result.push(tx)
                   txhases.push(tx.txhash)
@@ -105,6 +160,8 @@ const HistoryList = ({ chainID }: Props) => {
               .slice(0, LIMIT)
               .map((tx) => ({ ...tx, chain }))
           },
+          retry: false,
+          refetchOnWindowFocus: false
         }
       })
   )

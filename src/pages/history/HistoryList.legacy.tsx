@@ -26,18 +26,22 @@ const HistoryList = ({ chainID }: Props) => {
   const fetchAccountHistory = useCallback(
     async ({ pageParam = 0 }) => {
       const { data } = await axios.get<AccountHistory>(
-        `/cosmos/tx/v1beta1/txs?events=message.sender=%27${address}%27&pagination.reverse=true&order_by=ORDER_BY_DESC&pagination.limit=${LIMIT}`,
+        `/cosmos/tx/v1beta1/txs`,
         {
           baseURL: networks[chainID].lcd,
-          params: { "pagination.offset": pageParam || undefined },
+          params: {
+            query: `message.sender='${address}'`,
+            order_by: "ORDER_BY_DESC",
+            "pagination.limit": LIMIT,
+            "pagination.offset": pageParam || undefined
+          }
         }
       )
 
       return {
         ...data,
         next:
-          Number(data.pagination.total) > pageParam + LIMIT &&
-          pageParam + LIMIT,
+          Number(data.pagination.total) > pageParam + LIMIT && pageParam + LIMIT
       }
     },
     [address, networks, chainID]
@@ -48,7 +52,7 @@ const HistoryList = ({ chainID }: Props) => {
     fetchAccountHistory,
     {
       getNextPageParam: ({ next }) => next,
-      enabled: !!(address && networks[chainID]),
+      enabled: !!(address && networks[chainID])
     }
   )
 
@@ -89,8 +93,8 @@ const HistoryList = ({ chainID }: Props) => {
           {isFetchingNextPage
             ? t("Loading more...")
             : hasNextPage
-            ? t("Load more")
-            : t("Nothing more to load")}
+              ? t("Load more")
+              : t("Nothing more to load")}
         </Button>
       </Col>
     )
